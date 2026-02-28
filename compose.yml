@@ -1,0 +1,7 @@
+services:
+  kali-mcp:
+    build: .
+    container_name: kali-mcp
+    ports:
+      - "666:8000"
+    restart: unless-stopped

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kali": {
+      "type": "http",
+      "url": "http://localhost:666/mcp"
+    }
+  }
+}
