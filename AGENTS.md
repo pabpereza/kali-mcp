@@ -4,7 +4,7 @@ This project exposes Kali Linux security tools via MCP (Model Context Protocol).
 
 ## MCP Connection
 
-The Kali container exposes MCP at `http://localhost:666/mcp`. The container must be running (`docker compose up -d`) before using any tools.
+The Kali container exposes MCP at `http://localhost:666/mcp`. The container must be running (`./init.sh` or `docker compose -f docker/compose.yml up -d`) before using any tools.
 
 ## Available MCP Tools
 

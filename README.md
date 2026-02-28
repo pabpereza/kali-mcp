@@ -36,18 +36,15 @@ Compatible con cualquier agente de IA que soporte MCP: Claude Code, Gemini CLI, 
 git clone <repo-url> && cd kali-mcp
 
 # 2. Levantar el contenedor
-docker compose up -d
+./init.sh
 
-# 3. Verificar que el servidor esta activo
-curl http://localhost:666/mcp
-
-# 4. Abrir tu agente de IA en el directorio del proyecto
+# 3. Abrir tu agente de IA en el directorio del proyecto
 claude          # Claude Code
 gemini          # Gemini CLI
 opencode        # OpenCode
 ```
 
-El agente detectara la configuracion MCP y tendra acceso a todas las herramientas de Kali.
+El script `init.sh` construye la imagen, levanta el contenedor y espera a que el servidor MCP este listo. El agente detectara la configuracion MCP en `.mcp.json` automaticamente.
 
 ## Compatibilidad
 
@@ -242,12 +239,14 @@ No utilices estas herramientas contra sistemas sin autorizacion explicita.
 
 ```
 kali-mcp/
+├── init.sh                 # Levanta el contenedor y espera a que este listo
 ├── AGENTS.md               # Instrucciones para agentes de IA (estandar abierto)
 ├── CLAUDE.md               # Instrucciones adicionales para Claude Code (sub-agentes)
-├── Dockerfile              # Imagen Kali con herramientas de seguridad
-├── compose.yml             # Docker Compose
-├── entrypoint.sh           # Inicia kali-server-mcp + supergateway
 ├── .mcp.json               # Configuracion MCP (detectada por los agentes)
+├── docker/                 # Ficheros del contenedor
+│   ├── Dockerfile          # Imagen Kali con herramientas de seguridad
+│   ├── compose.yml         # Docker Compose
+│   └── entrypoint.sh       # Inicia kali-server-mcp + supergateway
 └── .claude/
     └── commands/           # Slash commands (solo Claude Code)
         ├── audit.md        # Orquestador principal con sub-agentes

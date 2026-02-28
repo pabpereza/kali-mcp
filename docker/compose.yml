@@ -1,6 +1,8 @@
 services:
   kali-mcp:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: kali-mcp
     ports:
       - "666:8000"
