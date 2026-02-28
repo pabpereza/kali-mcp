@@ -25,6 +25,9 @@ RUN npm install -g supergateway
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+RUN mkdir -p /tmp/workspace
+WORKDIR /tmp/workspace
+
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]

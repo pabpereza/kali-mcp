@@ -8,7 +8,7 @@ echo "[*] Building and starting Kali MCP container..."
 docker compose -f "$DOCKER_DIR/compose.yml" up -d --build
 
 echo "[*] Waiting for MCP server to be ready..."
-until curl -sf http://localhost:666/mcp > /dev/null 2>&1; do
+until curl -so /dev/null http://localhost:666/mcp 2>/dev/null; do
     sleep 1
 done
 
