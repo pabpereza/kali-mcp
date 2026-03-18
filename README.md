@@ -1,11 +1,11 @@
 # Kali MCP
 
-Toolkit de hacking etico que conecta agentes de IA con herramientas de seguridad de Kali Linux mediante MCP (Model Context Protocol).
+An ethical hacking toolkit that connects AI agents to Kali Linux security tools via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/).
 
-Compatible con cualquier agente de IA que soporte MCP: Claude Code, Gemini CLI, OpenCode, Cursor, Copilot, Codex, Aider, Windsurf, goose, y otros.
+Compatible with any AI agent that supports MCP: Claude Code, Gemini CLI, OpenCode, Cursor, Copilot, Codex, Aider, Windsurf, goose, and others.
 
 ```
-> Audita el host 192.168.1.50
+> Audit host 192.168.1.50
 
  Scanning target with nmap...
 
@@ -24,73 +24,69 @@ Compatible con cualquier agente de IA que soporte MCP: Claude Code, Gemini CLI, 
  Consolidated report ready.
 ```
 
-## Requisitos
+## Prerequisites
 
-- Docker y Docker Compose
-- Un agente de IA con soporte MCP (ver [Compatibilidad](#compatibilidad))
+- **Docker** and **Docker Compose** (v2+)
+- An AI agent with MCP support (see [Compatibility](#compatibility))
+- A terminal with `curl` (used by `init.sh` to health-check the container)
 
-## Inicio rapido
+## Getting Started
+
+### 1. Clone the repository
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url> && cd kali-mcp
+git clone https://github.com/pabpereza/kali-mcp.git
+cd kali-mcp
+```
 
-# 2. Levantar el contenedor
+### 2. Start the Kali MCP container
+
+```bash
 ./init.sh
+```
 
-# 3. Abrir tu agente de IA en el directorio del proyecto
+This script will:
+1. Build the Docker image (Kali Linux with all security tools pre-installed).
+2. Start the container via Docker Compose.
+3. Wait until the MCP server is healthy and accepting connections on `http://localhost:666/mcp`.
+
+> On first run, the image build may take several minutes as it installs Kali packages.
+
+### 3. Launch your AI agent
+
+Open your AI agent **from the project directory** so it auto-detects the `.mcp.json` configuration:
+
+```bash
 claude          # Claude Code
 gemini          # Gemini CLI
 opencode        # OpenCode
 ```
 
-El script `init.sh` construye la imagen, levanta el contenedor y espera a que el servidor MCP este listo. El agente detectara la configuracion MCP en `.mcp.json` automaticamente.
+That's it. The agent will read its instruction file (`AGENTS.md` or `CLAUDE.md`), connect to the MCP endpoint, and you can start issuing commands in natural language:
 
-## Compatibilidad
-
-El proyecto usa `AGENTS.md` como fichero de instrucciones, el estandar abierto soportado por la mayoria de agentes de IA. Adicionalmente, incluye `CLAUDE.md` para funcionalidades exclusivas de Claude Code.
-
-| Agente | Fichero de instrucciones | Soporte MCP | Sub-agentes paralelos |
-|--------|--------------------------|-------------|----------------------|
-| **Claude Code** | `CLAUDE.md` + `AGENTS.md` (via referencia) | Nativo (`.mcp.json`) | Si (Agent tool) |
-| **Gemini CLI** | `AGENTS.md` | Nativo | No |
-| **OpenCode** | `AGENTS.md` | Nativo | No |
-| **Cursor** | `AGENTS.md` | Nativo | No |
-| **GitHub Copilot** | `AGENTS.md` | Nativo | No |
-| **Codex (OpenAI)** | `AGENTS.md` | Nativo | No |
-| **Aider** | `AGENTS.md` | Nativo | No |
-| **Windsurf** | `AGENTS.md` | Nativo | No |
-| **goose** | `AGENTS.md` | Nativo | No |
-
-> **Nota sobre sub-agentes**: La arquitectura de auditorias paralelas (un agente por puerto/servicio) es una funcionalidad exclusiva de Claude Code mediante su Agent tool. El resto de agentes ejecutan las auditorias de forma secuencial siguiendo la misma metodologia definida en `AGENTS.md`. El resultado final es equivalente; Claude Code simplemente lo hace mas rapido al paralelizar.
-
-### Configuracion MCP por agente
-
-El fichero `.mcp.json` en la raiz del proyecto es el estandar:
-
-```json
-{
-  "mcpServers": {
-    "kali": {
-      "type": "http",
-      "url": "http://localhost:666/mcp"
-    }
-  }
-}
+```
+> Scan ports on 10.10.10.5 with version detection
+> Find hidden directories on http://target.com
+> Run wpscan against http://blog.target.com
+> Check if FTP on 10.10.10.5 allows anonymous login
 ```
 
-La mayoria de agentes lo detectan automaticamente. Si tu agente requiere configuracion manual, apunta al endpoint MCP en `http://localhost:666/mcp`.
+### 4. Stopping the container
 
-## Arquitectura
+```bash
+docker compose -f docker/compose.yml down
+```
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Agente de IA (Claude / Gemini / OpenCode / ...)    │
+│  AI Agent (Claude / Gemini / OpenCode / ...)        │
 │                                                     │
-│  Lee AGENTS.md (o CLAUDE.md) para instrucciones     │
-│  Usa herramientas MCP para ejecutar acciones        │
+│  Reads AGENTS.md (or CLAUDE.md) for instructions    │
+│  Uses MCP tools to execute security actions         │
 │                                                     │
-│  [Claude Code: sub-agentes paralelos por puerto]    │
+│  [Claude Code: parallel sub-agents per port]        │
 └──────────────────────┬──────────────────────────────┘
                        │ MCP (HTTP) localhost:666
 ┌──────────────────────┼──────────────────────────────┐
@@ -111,106 +107,171 @@ La mayoria de agentes lo detectan automaticamente. Si tu agente requiere configu
 └─────────────────────────────────────────────────────┘
 ```
 
-## Herramientas disponibles
+The container runs two processes:
 
-Puedes invocar las herramientas directamente en lenguaje natural:
+1. **kali-server-mcp** — A Flask API (port 5000, internal) that wraps Kali security tools and exposes them as MCP-compatible operations.
+2. **supergateway** — A bridge (port 8000, mapped to host port 666) that converts the internal stdio-based MCP protocol to Streamable HTTP, so any external agent can connect over the network.
+
+## Repository Structure
 
 ```
-> Escanea los puertos de 10.10.10.5 con deteccion de version
-> Busca directorios ocultos en http://target.com
-> Lanza wpscan contra http://blog.target.com
-> Comprueba si el FTP en 10.10.10.5 permite login anonimo
+kali-mcp/
+├── init.sh                  # Bootstrap script: build, start, and wait for readiness
+├── .mcp.json                # MCP server configuration (auto-detected by agents)
+├── AGENTS.md                # Agent instructions: tools, auth policy, methodology, service playbooks
+├── CLAUDE.md                # Claude Code-specific: references AGENTS.md + sub-agent architecture
+├── docker/
+│   ├── Dockerfile           # Kali Linux image with all security tools
+│   ├── compose.yml          # Docker Compose service definition
+│   └── entrypoint.sh        # Container entrypoint: starts Flask API + supergateway
+└── .claude/
+    └── commands/            # Slash commands (Claude Code only)
+        ├── audit.md         # /audit — Full audit with parallel sub-agents
+        ├── pentest.md       # /pentest — Full pentest in 5 phases
+        ├── network-discovery.md  # /network-discovery — Host discovery per range
+        ├── recon.md         # /recon — Passive reconnaissance
+        ├── vuln-scan.md     # /vuln-scan — Vulnerability identification
+        ├── web-audit.md     # /web-audit — Web application audit
+        ├── wp-audit.md      # /wp-audit — WordPress audit
+        ├── brute.md         # /brute — Brute force with hydra/john
+        └── exploit.md       # /exploit — Exploit a specific vulnerability
 ```
 
-| Herramienta | Funcion | Intrusiva |
-|-------------|---------|-----------|
-| `nmap_scan` | Escaneo de puertos, deteccion de version/OS, scripts NSE | No |
-| `gobuster_scan` | Enumeracion de directorios, DNS y vhosts | No |
-| `dirb_scan` | Descubrimiento de contenido web | No |
-| `nikto_scan` | Escaneo de vulnerabilidades en servidores web | No |
-| `wpscan_analyze` | Escaneo de vulnerabilidades en WordPress | No |
-| `enum4linux_scan` | Enumeracion de Windows/Samba | No |
-| `sqlmap_scan` | Deteccion y explotacion de inyeccion SQL | **Si** |
-| `hydra_attack` | Fuerza bruta de contrasenas | **Si** |
-| `john_crack` | Cracking de hashes | **Si** |
-| `metasploit_run` | Ejecucion de modulos de Metasploit | **Si** |
-| `execute_command` | Comando arbitrario en el contenedor Kali | Depende |
+### Key Files
 
-## Comandos de Claude Code (slash commands)
+| File | Who reads it | Purpose |
+|------|-------------|---------|
+| `AGENTS.md` | All agents (Gemini CLI, OpenCode, Cursor, Copilot, etc.) | Tools reference, authorization policy, audit methodology, per-service playbooks |
+| `CLAUDE.md` | Claude Code | References AGENTS.md + defines slash commands and sub-agent architecture |
+| `.claude/commands/*.md` | Claude Code | Slash command definitions for orchestrated workflows |
+| `.mcp.json` | All agents | MCP server endpoint configuration |
 
-Estos comandos son exclusivos de Claude Code y aprovechan la arquitectura de sub-agentes paralelos:
+## Compatibility
 
-### Orquestadores (lanzan sub-agentes en paralelo)
+The project uses `AGENTS.md` as the instruction file — the open standard supported by most AI agents. Additionally, `CLAUDE.md` provides Claude Code-exclusive features like parallel sub-agents.
 
-| Comando | Descripcion |
+| Agent | Instruction file | MCP support | Parallel sub-agents |
+|-------|-----------------|-------------|---------------------|
+| **Claude Code** | `CLAUDE.md` + `AGENTS.md` (via reference) | Native (`.mcp.json`) | Yes (Agent tool) |
+| **Gemini CLI** | `AGENTS.md` | Native | No |
+| **OpenCode** | `AGENTS.md` | Native | No |
+| **Cursor** | `AGENTS.md` | Native | No |
+| **GitHub Copilot** | `AGENTS.md` | Native | No |
+| **Codex (OpenAI)** | `AGENTS.md` | Native | No |
+| **Aider** | `AGENTS.md` | Native | No |
+| **Windsurf** | `AGENTS.md` | Native | No |
+| **goose** | `AGENTS.md` | Native | No |
+
+> **Note on sub-agents**: The parallel audit architecture (one agent per port/service) is a Claude Code-exclusive feature via its Agent tool. Other agents execute audits sequentially following the same methodology defined in `AGENTS.md`. The end result is equivalent; Claude Code simply does it faster by parallelizing.
+
+### Manual MCP configuration
+
+The `.mcp.json` file in the project root is the standard configuration:
+
+```json
+{
+  "mcpServers": {
+    "kali": {
+      "type": "http",
+      "url": "http://localhost:666/mcp"
+    }
+  }
+}
+```
+
+Most agents auto-detect this file. If your agent requires manual configuration, point it to `http://localhost:666/mcp`.
+
+## Available Tools
+
+| Tool | Function | Intrusive |
+|------|----------|-----------|
+| `nmap_scan` | Port scanning, version/OS detection, NSE scripts | No |
+| `gobuster_scan` | Directory, DNS, and vhost enumeration | No |
+| `dirb_scan` | Web content discovery | No |
+| `nikto_scan` | Web server vulnerability scanning | No |
+| `wpscan_analyze` | WordPress vulnerability scanning | No |
+| `enum4linux_scan` | Windows/Samba enumeration | No |
+| `sqlmap_scan` | SQL injection detection and exploitation | **Yes** |
+| `hydra_attack` | Password brute force | **Yes** |
+| `john_crack` | Password hash cracking | **Yes** |
+| `metasploit_run` | Metasploit module execution | **Yes** |
+| `execute_command` | Arbitrary command on the Kali container | Depends |
+
+## Claude Code Slash Commands
+
+These commands are exclusive to Claude Code and leverage the parallel sub-agent architecture:
+
+### Orchestrators (launch parallel sub-agents)
+
+| Command | Description |
 |---------|-------------|
-| `/project:audit <target>` | Auditoria completa: descubre puertos, lanza un agente por servicio, consolida informe |
-| `/project:pentest <target>` | Pentest completo en 5 fases con autorizacion por alcance |
-| `/project:network-discovery <rango>` | Descubre hosts en la red y lanza un agente por host |
+| `/audit <target>` | Full audit: discover ports, launch one agent per service, consolidated report |
+| `/pentest <target>` | Full pentest in 5 phases with scope-based authorization |
+| `/network-discovery <range>` | Discover hosts on the network, launch one agent per host |
 
-### Autonomos
+### Standalone
 
-| Comando | Descripcion |
+| Command | Description |
 |---------|-------------|
-| `/project:recon <target>` | Reconocimiento pasivo (nmap + gobuster + nikto) |
-| `/project:vuln-scan <target>` | Identificacion de vulnerabilidades con nmap scripts |
-| `/project:web-audit <url>` | Auditoria de aplicacion web |
-| `/project:wp-audit <url>` | Auditoria especifica de WordPress |
-| `/project:brute <target> <servicio>` | Fuerza bruta con hydra/john |
-| `/project:exploit <target> <vuln>` | Explotacion de una vulnerabilidad concreta |
+| `/recon <target>` | Passive reconnaissance (nmap + gobuster + nikto) |
+| `/vuln-scan <target>` | Vulnerability identification with nmap scripts |
+| `/web-audit <url>` | Web application audit |
+| `/wp-audit <url>` | WordPress audit |
+| `/brute <target> <service>` | Brute force with hydra/john |
+| `/exploit <target> <vuln>` | Exploit a specific vulnerability |
 
-## Politica de autorizacion
+## Authorization Policy
 
-Las herramientas intrusivas (sqlmap, hydra, john, metasploit) **siempre requieren confirmacion del usuario** antes de ejecutarse. Esto esta definido tanto en `AGENTS.md` como en `CLAUDE.md`.
+Intrusive tools (sqlmap, hydra, john, metasploit) **always require user confirmation** before execution. This is enforced in both `AGENTS.md` and `CLAUDE.md`.
 
-Al solicitar una auditoria completa, el agente pregunta el nivel de profundidad:
+When requesting a full audit, the agent asks for the engagement scope:
 
-1. **Solo pasivo** — Reconocimiento y deteccion de vulnerabilidades
-2. **Pasivo + credenciales** — Anade fuerza bruta con wordlists pequenas
-3. **Auditoria completa** — Incluye sqlmap, metasploit y todas las pruebas intrusivas
+1. **Passive only** — Reconnaissance and vulnerability identification
+2. **Passive + Credential testing** — Adds brute force with small wordlists
+3. **Full audit** — Includes sqlmap, metasploit, and all intrusive tests
 
-## Flujo de auditoria (Claude Code con sub-agentes)
+## Audit Workflow (Claude Code with sub-agents)
 
 ```
-/project:audit 10.10.10.5
+/audit 10.10.10.5
         |
         v
    Phase 1: nmap -sV -sC -O
         |
         v
-   Muestra puertos y servicios
+   Displays ports and services
         |
         v
-   Pregunta nivel de autorizacion
+   Asks for authorization level
         |
         v
-   Phase 2: Lanza sub-agentes en paralelo
+   Phase 2: Launches sub-agents in parallel
         |
         |-- Agent HTTP :80   -> nikto + gobuster + dirb + wpscan + sqlmap*
         |-- Agent SSH :22    -> ssh scripts + hydra*
         |-- Agent SMB :445   -> enum4linux + smb-vuln scripts
         |-- Agent MySQL :3306 -> mysql scripts + hydra*
         |-- Agent FTP :21    -> ftp scripts + hydra*
-        '-- ... (1 agente por puerto)
+        '-- ... (1 agent per port)
         |
-        v                        (* segun autorizacion)
-   Phase 3: Informe consolidado
+        v                        (* depending on authorization)
+   Phase 3: Consolidated report
         |
-        |-- Resumen ejecutivo
-        |-- Hallazgos por severidad (Critical/High/Medium/Low)
-        |-- Resumen puerto por puerto
-        |-- Rutas de ataque encadenadas
-        '-- Plan de remediacion priorizado
+        |-- Executive summary
+        |-- Findings by severity (Critical/High/Medium/Low)
+        |-- Port-by-port summary
+        |-- Chained attack paths
+        '-- Prioritized remediation roadmap
 ```
 
-> Con otros agentes (Gemini CLI, OpenCode, etc.) el flujo es identico pero secuencial: el agente ejecuta cada servicio uno tras otro siguiendo la misma metodologia de `AGENTS.md`.
+> With other agents (Gemini CLI, OpenCode, etc.) the workflow is identical but sequential: the agent audits each service one after another following the same methodology from `AGENTS.md`.
 
-## Servicios soportados
+## Supported Services
 
-Cada servicio tiene un playbook de auditoria definido en `AGENTS.md`:
+Each service has an audit playbook defined in `AGENTS.md`:
 
-| Servicio | Puertos | Herramientas |
-|----------|---------|--------------|
+| Service | Ports | Tools |
+|---------|-------|-------|
 | HTTP/HTTPS | 80, 443, 8080, 8443 | nikto, gobuster, dirb, wpscan, sqlmap |
 | SSH | 22 | nmap ssh-scripts, hydra |
 | FTP | 21 | nmap ftp-scripts, hydra |
@@ -223,48 +284,37 @@ Cada servicio tiene un playbook de auditoria definido en `AGENTS.md`:
 | RDP | 3389 | nmap rdp-scripts, hydra |
 | SNMP | 161 | nmap snmp-scripts |
 | LDAP | 389, 636 | nmap ldap-scripts |
-| Generico | cualquier otro | nmap --script safe, banner grab |
+| Generic | any other | nmap --script safe, banner grab |
 
-## Uso etico
+## Troubleshooting
 
-Este toolkit esta disenado exclusivamente para:
-- Pentesting autorizado con acuerdo escrito
-- Competiciones CTF (Capture The Flag)
-- Entornos de laboratorio y practica (HackTheBox, TryHackMe, VulnHub)
-- Investigacion de seguridad defensiva
+| Problem | Solution |
+|---------|----------|
+| `init.sh` hangs at "Waiting for MCP server" | Check Docker is running: `docker ps`. Inspect logs: `docker logs kali-mcp`. |
+| Agent can't connect to MCP | Verify the container is up: `curl http://localhost:666/mcp`. Restart with `./init.sh`. |
+| Port 666 already in use | Change the host port in `docker/compose.yml` (`"<new-port>:8000"`) and update `.mcp.json` accordingly. |
+| Image build fails | Ensure you have internet access. Kali repos may be temporarily unavailable — retry after a few minutes. |
+| Tools timeout on large scans | Some scans (full nmap, sqlmap) can take minutes. The container does not have resource limits by default — add them in `compose.yml` if needed. |
 
-No utilices estas herramientas contra sistemas sin autorizacion explicita.
+## Disclaimer
 
-## Estructura del proyecto
+> **WARNING**: This toolkit is intended **exclusively** for authorized security testing. Misuse of these tools may violate local, national, and international laws.
 
-```
-kali-mcp/
-├── init.sh                 # Levanta el contenedor y espera a que este listo
-├── AGENTS.md               # Instrucciones para agentes de IA (estandar abierto)
-├── CLAUDE.md               # Instrucciones adicionales para Claude Code (sub-agentes)
-├── .mcp.json               # Configuracion MCP (detectada por los agentes)
-├── docker/                 # Ficheros del contenedor
-│   ├── Dockerfile          # Imagen Kali con herramientas de seguridad
-│   ├── compose.yml         # Docker Compose
-│   └── entrypoint.sh       # Inicia kali-server-mcp + supergateway
-└── .claude/
-    └── commands/           # Slash commands (solo Claude Code)
-        ├── audit.md        # Orquestador principal con sub-agentes
-        ├── pentest.md      # Pentest completo en 5 fases
-        ├── network-discovery.md
-        ├── recon.md
-        ├── vuln-scan.md
-        ├── web-audit.md
-        ├── wp-audit.md
-        ├── brute.md
-        └── exploit.md
-```
+**You must ensure that:**
 
-### Que lee cada agente
+- You have **explicit written authorization** from the system owner before testing any target.
+- You are operating within the **agreed scope** of the engagement.
+- You understand that intrusive tools (sqlmap, hydra, metasploit) **can disrupt services**, corrupt data, or trigger security alerts.
 
-| Fichero | Quien lo lee | Contenido |
-|---------|-------------|-----------|
-| `AGENTS.md` | Gemini CLI, OpenCode, Cursor, Copilot, Codex, Aider, Windsurf, goose | Herramientas, politica de autorizacion, metodologia de auditoria, playbooks por servicio |
-| `CLAUDE.md` | Claude Code | Referencia a AGENTS.md + slash commands + arquitectura de sub-agentes |
-| `.claude/commands/*.md` | Claude Code | Definicion de los slash commands |
-| `.mcp.json` | Todos | Configuracion del servidor MCP |
+**Acceptable use cases:**
+
+- Penetration testing engagements with a signed agreement
+- CTF (Capture The Flag) competitions
+- Lab environments (HackTheBox, TryHackMe, VulnHub, personal labs)
+- Defensive security research
+
+**The authors of this project assume no liability for damages caused by misuse of this toolkit. You are solely responsible for your actions.**
+
+## License
+
+This project is provided as-is for educational and authorized security testing purposes. See individual tool licenses (nmap, sqlmap, metasploit, etc.) for their respective terms.
