@@ -8,7 +8,7 @@ Read `AGENTS.md` for the full project context: available MCP tools, authorizatio
 | Command | Description |
 |---------|-------------|
 | `/project:audit <target>` | Full audit: nmap discovery, sub-agent per port, consolidated report |
-| `/project:pentest <target>` | Full pentest in 5 phases with scoped authorization |
+| `/project:pentest <target>` | Full pentest with max parallelism: 7+ specialized sub-agents per web target |
 | `/project:network-discovery <range>` | Host discovery, sub-agent per live host |
 
 ### Standalone
@@ -23,17 +23,41 @@ Read `AGENTS.md` for the full project context: available MCP tools, authorizatio
 
 ## Sub-Agent Architecture
 
-The `/project:audit` command uses Claude Code's Agent tool to parallelize work:
+### Design Principles
 
-1. **Orchestrator** runs nmap to discover all open ports and services
-2. Asks user for authorization level (passive / credentials / full)
-3. Launches **one sub-agent per port** in parallel via the Agent tool (`subagent_type: "general-purpose"`)
-4. Each sub-agent is specialized for its service type (see AGENTS.md per-service playbooks)
-5. Sub-agents receive the authorization level and respect its constraints
-6. Orchestrator consolidates all sub-agent results into a final report
+1. **Orchestrator stays clean**: The main process ONLY does nmap discovery, asks authorization, dispatches sub-agents, and compiles the final report. No scanning in the orchestrator.
+2. **Maximum parallelism**: ALL sub-agents launch in a SINGLE `Agent` tool call so they run concurrently.
+3. **Specialized agents**: Each sub-agent has a focused mission (not a broad one). This reduces context bloat and improves results.
+4. **Scope injection**: Every sub-agent receives the authorization level in its prompt and respects its constraints.
 
-The `/project:network-discovery` command follows the same pattern: discover hosts first, then one sub-agent per host.
+### Sub-Agent Types for `/project:pentest`
+
+For a web application target, the orchestrator launches up to **7 parallel sub-agents**:
+
+| Sub-Agent | Mission | Scope Required |
+|-----------|---------|----------------|
+| Service Enumeration | Per-port service audit (nmap scripts, service-specific checks) | Passive |
+| Web Directory Enumeration | Discover hidden endpoints, files, directories | Passive |
+| API Security Testing | Test API endpoints, IDOR, auth bypass, info disclosure | Passive |
+| Auth & Session Testing | SQLi on login, JWT analysis, credential testing | Passive |
+| Vulnerability Scanning | nmap vuln scripts, nikto, CVE identification | Passive |
+| Credential Brute Force | hydra, default creds, password spray | Credential+ |
+| SQL Injection Exploitation | sqlmap, DB dump, data exfiltration | Full only |
+| Sensitive File Discovery | FTP bypass, null byte, path traversal, key/log exposure | Full only |
+
+### Sub-Agent Types for `/project:audit`
+
+One sub-agent per discovered port/service, using the service playbooks from AGENTS.md.
+
+### Sub-Agent Types for `/project:network-discovery`
+
+One sub-agent per discovered live host.
 
 ## Authorization via AskUserQuestion
 
 For intrusive tools (hydra_attack, sqlmap_scan, john_crack, metasploit_run), use `AskUserQuestion` to get explicit user confirmation before execution. Never run intrusive tools without asking first.
+
+Three authorization levels:
+1. **Passive only** — Scanning and vulnerability identification
+2. **Passive + Credential testing** — Adds brute force
+3. **Full pentest/audit** — All tools including sqlmap, metasploit
