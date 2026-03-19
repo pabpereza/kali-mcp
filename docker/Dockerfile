@@ -7,6 +7,8 @@ RUN apt-get update && \
     gobuster \
     dirb \
     nikto \
+    perl \
+    libnet-ssleay-perl \
     sqlmap \
     hydra \
     john \
@@ -29,5 +31,8 @@ RUN mkdir -p /tmp/workspace
 WORKDIR /tmp/workspace
 
 EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+  CMD curl -sf http://localhost:5000/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
