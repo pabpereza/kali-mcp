@@ -19,8 +19,7 @@ RUN apt-get update && \
     net-tools \
     iputils-ping \
     nodejs \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
+    npm
 
 RUN npm install -g supergateway
 
