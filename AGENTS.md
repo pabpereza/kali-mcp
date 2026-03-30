@@ -110,6 +110,46 @@ After all scans complete, compile a report with:
 5. **Attack Paths**: Chained findings that form exploitable paths
 6. **Remediation Roadmap**: Prioritized fixes, most critical first
 
+## Session Persistence
+
+All scan commands persist their outputs to a `sessions/` directory. This enables traceability, resumability, and consolidated reporting across conversations.
+
+### For Sub-Agents
+
+When a sub-agent receives a `SESSION_DIR` path in its prompt, it MUST:
+1. Save its complete output (commands run, raw output, findings) to `sessions/<SESSION_DIR>/assets/<agent_name>.md` using the Write tool.
+2. The asset file should include:
+   - All commands executed with their full output
+   - Findings with severity ratings
+   - Evidence (command output, response data)
+   - Remediation recommendations
+
+### Asset Naming Convention
+
+| Agent Type | Filename Pattern |
+|-----------|-----------------|
+| Service Enumeration | `service_enum_port<PORT>.md` |
+| Web Directory Enum | `web_directory_enum_port<PORT>.md` |
+| API Security Testing | `api_security_port<PORT>.md` |
+| Auth & Session Testing | `auth_session_testing_port<PORT>.md` |
+| Vulnerability Scanning | `vuln_scanning.md` |
+| Credential Brute Force | `credential_brute_force.md` |
+| SQL Injection | `sqli_exploitation.md` |
+| Sensitive Files | `sensitive_files.md` |
+| Recon tools | `recon_<tool_name>.md` |
+| Host-specific (network) | `host_<IP_sanitized>.md` |
+| Nmap discovery | `nmap_discovery.md` |
+
+### Session Directory Structure
+
+```
+sessions/<target>_<YYYYMMDD_HHMM>/
+├── session.md      # Metadata, timeline, sub-agent list
+├── targets.md      # Target list with status
+├── findings.md     # Consolidated findings by severity
+└── assets/         # One file per sub-agent/command
+```
+
 ## Ethical Use
 
 Only use these tools against:

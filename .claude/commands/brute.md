@@ -30,3 +30,11 @@ Report:
 - **Valid credentials found**: Table with username and password
 - **Statistics**: Attempts made, time elapsed
 - **Recommendations**: Password policy improvements
+
+## Session Persistence
+
+After presenting results, save outputs to the active session (if one exists, or create one):
+1. Check for active session: `ls -td sessions/*/ 2>/dev/null | head -1`
+2. If no session, create: `mkdir -p sessions/<target_sanitized>_<timestamp>/assets`
+3. Save all scan outputs to `sessions/<SESSION_DIR>/assets/brute_<service>.md`
+4. Update `sessions/<SESSION_DIR>/session.md` with timeline entries.

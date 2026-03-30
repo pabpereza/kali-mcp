@@ -2,6 +2,25 @@ Perform a full security audit on the target: $ARGUMENTS
 
 You are the **orchestrator**. Your job is to discover services and then launch specialized sub-agents in parallel for each discovered port/service.
 
+## Phase 0: Session Management (orchestrator does this FIRST)
+
+Before any scanning, set up the session workspace:
+
+1. Check if a session directory already exists for this target:
+   ```bash
+   ls -td sessions/*/ 2>/dev/null | head -1
+   ```
+2. If a session exists and its `session.md` shows status `IN PROGRESS`, use that session directory.
+3. If no session exists, create one:
+   - Sanitize the target name (replace `/`, `:`, `.` with `_`)
+   - Generate timestamp with `date +%Y%m%d_%H%M`
+   - Create the directory: `mkdir -p sessions/<sanitized_target>_<timestamp>/assets`
+   - Create `session.md` with target, date, type (Audit), status (IN PROGRESS)
+   - Create `targets.md` with the target list
+4. Store the session directory path as `SESSION_DIR` for all subsequent operations.
+
+**All sub-agents MUST receive the `SESSION_DIR` path in their prompts.**
+
 ## Authorization Policy
 
 Actions are classified in two tiers:
@@ -39,6 +58,7 @@ Use the service classification below to build each sub-agent's prompt. Every sub
 - The specific port number
 - The service name and version detected
 - The detailed instructions from the matching category below
+- **SESSION OUTPUT instruction**: `When you finish, use the Write tool to save your COMPLETE output (all commands run, raw output, and findings) to: sessions/<SESSION_DIR>/assets/audit_<service>_port<PORT>.md`
 
 ### Service Categories and Sub-Agent Prompts:
 
@@ -205,3 +225,14 @@ Once ALL sub-agents have returned their results, compile a **final consolidated 
 4. **Port-by-Port Summary**: Table linking each port to key findings from its sub-agent.
 5. **Attack Paths**: If multiple findings can be chained together, describe the attack path.
 6. **Remediation Roadmap**: Prioritized list of fixes, most critical first.
+
+## Phase 4: Session Persistence (you do this after the report)
+
+1. Save the nmap discovery output to `sessions/<SESSION_DIR>/assets/nmap_discovery.md`.
+2. Write the final consolidated report to `sessions/<SESSION_DIR>/findings.md`.
+3. Update `sessions/<SESSION_DIR>/targets.md` with findings count per target.
+4. Update `sessions/<SESSION_DIR>/session.md`:
+   - Add each sub-agent dispatched to the "Sub-Agents Dispatched" section
+   - Add timeline entries for each phase completed
+   - Keep status as `IN PROGRESS` (use `/project:finish` to finalize)
+5. Print a summary of saved assets.
