@@ -5,23 +5,41 @@ An ethical hacking toolkit that connects AI agents to Kali Linux security tools 
 Compatible with any AI agent that supports MCP: Claude Code, Gemini CLI, OpenCode, Cursor, Copilot, Codex, Aider, Windsurf, goose, and others.
 
 ```
-> Audit host 192.168.1.50
+> /project:start 192.168.1.50
 
- Scanning target with nmap...
+  SESSION INITIALIZED
+  Target:  192.168.1.50
+  Type:    Full Pentest
+  Scope:   Passive + Credential testing
+  Dir:     sessions/192_168_1_50_20260331_1430/
 
- PORT    SERVICE       VERSION
- 22/tcp  ssh           OpenSSH 8.9
- 80/tcp  http          Apache 2.4.54
- 443/tcp https         nginx 1.18
- 445/tcp microsoft-ds  Samba 4.15
+> /project:pentest 192.168.1.50
 
- Analyzing 4 services...
-   [SSH :22]   -> version analysis, weak algos, CVEs
-   [HTTP :80]  -> nikto, gobuster, dirb, wpscan
-   [HTTPS:443] -> nikto, gobuster, ssl audit
-   [SMB :445]  -> enum4linux, smb-vuln scripts
+  Scanning with nmap...
+  PORT    SERVICE       VERSION
+  22/tcp  ssh           OpenSSH 8.9
+  80/tcp  http          Apache 2.4.54
+  443/tcp https         nginx 1.18
+  445/tcp microsoft-ds  Samba 4.15
 
- Consolidated report ready.
+  Launching 10 parallel sub-agents...
+    [Service Enum :22]  -> SSH scripts, searchsploit CVEs
+    [Service Enum :80]  -> nikto, gobuster, ffuf, dirb
+    [Web Dirs :80]      -> ffuf directories, sensitive files
+    [Web Fuzz :80]      -> arjun params, nuclei templates
+    [OSINT :80]         -> whatweb, wafw00f, searchsploit
+    [API Testing :80]   -> IDOR, auth bypass
+    [Auth Testing :80]  -> SQLi on login, JWT analysis
+    [SMB Enum :445]     -> crackmapexec, enum4linux, smbclient
+    [AD Audit :445]     -> impacket, kerberoast
+    [Vuln Scan]         -> nmap vuln scripts, nuclei
+
+  All sub-agents completed. Results saved to session assets.
+
+> /project:finish
+
+  SESSION FINALIZED — 14 findings (2 Critical, 4 High, 5 Medium, 3 Low)
+  Report: sessions/192_168_1_50_20260331_1430/findings.md
 ```
 
 ## Prerequisites
@@ -32,49 +50,133 @@ Compatible with any AI agent that supports MCP: Claude Code, Gemini CLI, OpenCod
 
 ## Getting Started
 
-### 1. Clone the repository
+### 1. Clone and start
 
 ```bash
 git clone https://github.com/pabpereza/kali-mcp.git
 cd kali-mcp
-```
-
-### 2. Start the Kali MCP container
-
-```bash
 ./init.sh
 ```
 
-This script will:
-1. Build the Docker image (Kali Linux with all security tools pre-installed).
-2. Start the container via Docker Compose.
-3. Wait until the MCP server is healthy and accepting connections on `http://localhost:666/mcp`.
+`init.sh` builds the Kali Docker image, starts the container, and waits until the MCP server is healthy at `http://localhost:666/mcp`. First build may take several minutes.
 
-> On first run, the image build may take several minutes as it installs Kali packages.
+### 2. Launch your AI agent
 
-### 3. Launch your AI agent
-
-Open your AI agent **from the project directory** so it auto-detects the `.mcp.json` configuration:
+Open your agent **from the project directory** so it auto-detects `.mcp.json`:
 
 ```bash
-claude          # Claude Code
+claude          # Claude Code (recommended — supports parallel sub-agents)
 gemini          # Gemini CLI
 opencode        # OpenCode
 ```
 
-That's it. The agent will read its instruction file (`AGENTS.md` or `CLAUDE.md`), connect to the MCP endpoint, and you can start issuing commands in natural language:
+### 3. Start hacking
+
+You can use natural language or slash commands:
 
 ```
 > Scan ports on 10.10.10.5 with version detection
 > Find hidden directories on http://target.com
-> Run wpscan against http://blog.target.com
-> Check if FTP on 10.10.10.5 allows anonymous login
+> Check if FTP allows anonymous login on 10.10.10.5
 ```
 
-### 4. Stopping the container
+## Typical Workflow (Claude Code)
 
-```bash
-docker compose -f docker/compose.yml down
+The recommended workflow uses three commands: **start**, **scan**, and **finish**.
+
+### Quick: single scan
+
+For a quick one-off scan, just run the command directly:
+
+```
+> /project:recon 10.10.10.5
+> /project:vuln-scan 10.10.10.5
+> /project:web-audit http://target.com
+```
+
+Results are saved automatically to a session directory.
+
+### Full: managed session
+
+For a complete engagement, use the session system:
+
+```
+/project:start 10.10.10.5          # 1. Select target, type, and scope
+/project:pentest 10.10.10.5        # 2. Run the pentest (parallel sub-agents)
+/project:finish                    # 3. Double-check + consolidated report
+```
+
+#### Step 1: Initialize (`/project:start`)
+
+The start command asks three questions:
+1. **Target(s)** — IP, hostname, URL, or CIDR range
+2. **Engagement type** — Pentest, Audit, Recon, Network Discovery, or Web Audit
+3. **Scope** — Passive only, Passive + Credentials, or Full pentest
+
+It creates a session directory with the structure:
+```
+sessions/10_10_10_5_20260331_1430/
+├── session.md      # Metadata: target, date, type, scope, status
+├── targets.md      # Target list and progress
+├── findings.md     # Consolidated findings (generated by /finish)
+└── assets/         # Raw output from each sub-agent
+```
+
+#### Step 2: Run scans
+
+Run one or more scan commands. Each one saves its output to the session:
+
+| Command | What it does | Sub-agents |
+|---------|-------------|------------|
+| `/project:pentest <target>` | Full pentest with all phases | Up to 7+ parallel |
+| `/project:audit <target>` | Per-service audit | 1 per port |
+| `/project:network-discovery <range>` | Host discovery | 1 per host |
+| `/project:recon <target>` | Passive recon | None |
+| `/project:vuln-scan <target>` | Vulnerability scan | None |
+| `/project:web-audit <url>` | Web app audit | None |
+| `/project:wp-audit <url>` | WordPress audit | None |
+| `/project:brute <target> <service>` | Brute force | None |
+| `/project:exploit <target> <vuln>` | Exploitation | None |
+
+You can run multiple commands in sequence — all results accumulate in the same session.
+
+#### Step 3: Finalize (`/project:finish`)
+
+The finish command:
+1. **Inventories** all sub-agent outputs in `assets/`
+2. **Double-checks** completeness — flags missing or failed sub-agents
+3. **Compiles** deduplicated findings by severity (Critical/High/Medium/Low)
+4. **Generates** the consolidated report in `findings.md`
+5. **Updates** `session.md` with executive summary and statistics
+
+#### Resume later (`/project:resume`)
+
+Sessions persist on disk. To continue in a new conversation:
+
+```
+/project:resume                    # List available sessions
+/project:vuln-scan 10.10.10.5      # Run additional scans
+/project:finish                    # Re-finalize with new results
+```
+
+### Session output example
+
+After `/project:finish`, your session directory looks like:
+
+```
+sessions/10_10_10_5_20260331_1430/
+├── session.md                          # Status: COMPLETED, executive summary
+├── targets.md                          # Targets with findings count
+├── findings.md                         # 14 findings by severity
+└── assets/
+    ├── nmap_discovery.md               # Initial port scan
+    ├── service_enum_port22.md          # SSH audit
+    ├── service_enum_port80.md          # HTTP service audit
+    ├── web_directory_enum_port80.md    # Hidden directories found
+    ├── api_security_port80.md          # API testing results
+    ├── auth_session_testing_port80.md  # Auth bypass attempts
+    ├── service_enum_port445.md         # SMB audit
+    └── vuln_scanning.md                # CVE identification
 ```
 
 ## Architecture
@@ -103,86 +205,16 @@ docker compose -f docker/compose.yml down
 │  │  nmap · gobuster · dirb · nikto     │            │
 │  │  sqlmap · hydra · john · wpscan     │            │
 │  │  enum4linux · metasploit            │            │
+│  │  ffuf · nuclei · crackmapexec       │            │
+│  │  whatweb · amass · impacket · ...   │            │
+│  │  (50+ tools — see full list below)  │            │
 │  └─────────────────────────────────────┘            │
 └─────────────────────────────────────────────────────┘
 ```
 
-The container runs two processes:
-
-1. **kali-server-mcp** — A Flask API (port 5000, internal) that wraps Kali security tools and exposes them as MCP-compatible operations.
-2. **supergateway** — A bridge (port 8000, mapped to host port 666) that converts the internal stdio-based MCP protocol to Streamable HTTP, so any external agent can connect over the network.
-
-## Repository Structure
-
-```
-kali-mcp/
-├── init.sh                  # Bootstrap script: build, start, and wait for readiness
-├── .mcp.json                # MCP server configuration (auto-detected by agents)
-├── AGENTS.md                # Agent instructions: tools, auth policy, methodology, service playbooks
-├── CLAUDE.md                # Claude Code-specific: references AGENTS.md + sub-agent architecture
-├── docker/
-│   ├── Dockerfile           # Kali Linux image with all security tools
-│   ├── compose.yml          # Docker Compose service definition
-│   └── entrypoint.sh        # Container entrypoint: starts Flask API + supergateway
-└── .claude/
-    └── commands/            # Slash commands (Claude Code only)
-        ├── audit.md         # /audit — Full audit with parallel sub-agents
-        ├── pentest.md       # /pentest — Full pentest in 5 phases
-        ├── network-discovery.md  # /network-discovery — Host discovery per range
-        ├── recon.md         # /recon — Passive reconnaissance
-        ├── vuln-scan.md     # /vuln-scan — Vulnerability identification
-        ├── web-audit.md     # /web-audit — Web application audit
-        ├── wp-audit.md      # /wp-audit — WordPress audit
-        ├── brute.md         # /brute — Brute force with hydra/john
-        └── exploit.md       # /exploit — Exploit a specific vulnerability
-```
-
-### Key Files
-
-| File | Who reads it | Purpose |
-|------|-------------|---------|
-| `AGENTS.md` | All agents (Gemini CLI, OpenCode, Cursor, Copilot, etc.) | Tools reference, authorization policy, audit methodology, per-service playbooks |
-| `CLAUDE.md` | Claude Code | References AGENTS.md + defines slash commands and sub-agent architecture |
-| `.claude/commands/*.md` | Claude Code | Slash command definitions for orchestrated workflows |
-| `.mcp.json` | All agents | MCP server endpoint configuration |
-
-## Compatibility
-
-The project uses `AGENTS.md` as the instruction file — the open standard supported by most AI agents. Additionally, `CLAUDE.md` provides Claude Code-exclusive features like parallel sub-agents.
-
-| Agent | Instruction file | MCP support | Parallel sub-agents |
-|-------|-----------------|-------------|---------------------|
-| **Claude Code** | `CLAUDE.md` + `AGENTS.md` (via reference) | Native (`.mcp.json`) | Yes (Agent tool) |
-| **Gemini CLI** | `AGENTS.md` | Native | No |
-| **OpenCode** | `AGENTS.md` | Native | No |
-| **Cursor** | `AGENTS.md` | Native | No |
-| **GitHub Copilot** | `AGENTS.md` | Native | No |
-| **Codex (OpenAI)** | `AGENTS.md` | Native | No |
-| **Aider** | `AGENTS.md` | Native | No |
-| **Windsurf** | `AGENTS.md` | Native | No |
-| **goose** | `AGENTS.md` | Native | No |
-
-> **Note on sub-agents**: The parallel audit architecture (one agent per port/service) is a Claude Code-exclusive feature via its Agent tool. Other agents execute audits sequentially following the same methodology defined in `AGENTS.md`. The end result is equivalent; Claude Code simply does it faster by parallelizing.
-
-### Manual MCP configuration
-
-The `.mcp.json` file in the project root is the standard configuration:
-
-```json
-{
-  "mcpServers": {
-    "kali": {
-      "type": "http",
-      "url": "http://localhost:666/mcp"
-    }
-  }
-}
-```
-
-Most agents auto-detect this file. If your agent requires manual configuration, point it to `http://localhost:666/mcp`.
-
 ## Available Tools
 
+### Native MCP Tools
 | Tool | Function | Intrusive |
 |------|----------|-----------|
 | `nmap_scan` | Port scanning, version/OS detection, NSE scripts | No |
@@ -197,94 +229,183 @@ Most agents auto-detect this file. If your agent requires manual configuration, 
 | `metasploit_run` | Metasploit module execution | **Yes** |
 | `execute_command` | Arbitrary command on the Kali container | Depends |
 
-## Claude Code Slash Commands
+### Additional Tools (via `execute_command`)
 
-These commands are exclusive to Claude Code and leverage the parallel sub-agent architecture:
+| Category | Tools |
+|----------|-------|
+| **OSINT & Recon** | whatweb, theHarvester, fierce, dnsrecon, amass, sublist3r, wafw00f, whois, dig |
+| **Web Fuzzing** | ffuf, wfuzz, commix, arjun, nuclei |
+| **Network & AD** | masscan, crackmapexec, smbclient, impacket-*, responder, arp-scan, snmpwalk, netcat |
+| **Traffic Analysis** | tcpdump, tshark |
+| **Password Cracking** | hashcat, hash-identifier, cewl, crunch |
+| **Forensics** | binwalk, foremost, steghide, exiftool |
+| **Exploit Research** | searchsploit (ExploitDB) |
+| **Wordlists** | SecLists, rockyou.txt |
 
-### Orchestrators (launch parallel sub-agents)
+## Slash Commands Reference (Claude Code)
+
+### Session Management
 
 | Command | Description |
 |---------|-------------|
-| `/audit <target>` | Full audit: discover ports, launch one agent per service, consolidated report |
-| `/pentest <target>` | Full pentest in 5 phases with scope-based authorization |
-| `/network-discovery <range>` | Discover hosts on the network, launch one agent per host |
+| `/project:start <target>` | Initialize session: select target, engagement type, and scope |
+| `/project:resume [target]` | Resume a previous session (lists available if no target given) |
+| `/project:finish` | Finalize: double-check sub-agents, compile findings, generate report |
 
-### Standalone
+### Orchestrators (parallel sub-agents)
 
 | Command | Description |
 |---------|-------------|
-| `/recon <target>` | Passive reconnaissance (nmap + gobuster + nikto) |
-| `/vuln-scan <target>` | Vulnerability identification with nmap scripts |
-| `/web-audit <url>` | Web application audit |
-| `/wp-audit <url>` | WordPress audit |
-| `/brute <target> <service>` | Brute force with hydra/john |
-| `/exploit <target> <vuln>` | Exploit a specific vulnerability |
+| `/project:pentest <target>` | Full pentest: 7+ parallel sub-agents per web target |
+| `/project:audit <target>` | Full audit: 1 sub-agent per discovered port/service |
+| `/project:network-discovery <range>` | Host discovery: 1 sub-agent per live host |
+
+### Standalone scans
+
+| Command | Description |
+|---------|-------------|
+| `/project:recon <target>` | Passive recon (nmap + gobuster + ffuf + nikto + whatweb + nuclei) |
+| `/project:vuln-scan <target>` | Vulnerability identification (nmap scripts + nuclei + searchsploit) |
+| `/project:web-audit <url>` | Web application security audit |
+| `/project:wp-audit <url>` | WordPress security audit |
+| `/project:brute <target> <service>` | Brute force with hydra/john |
+| `/project:exploit <target> <vuln>` | Exploit a specific vulnerability |
+
+### OSINT & Reconnaissance
+
+| Command | Description |
+|---------|-------------|
+| `/project:osint <target>` | OSINT recon: whois, whatweb, theHarvester, fierce, dnsrecon, wafw00f |
+| `/project:subdomain-enum <domain>` | Subdomain discovery: sublist3r, amass, fierce, dnsrecon, ffuf vhost |
+| `/project:waf-detect <url>` | WAF/IPS detection: wafw00f, nmap scripts, security headers |
+
+### Advanced scanning
+
+| Command | Description |
+|---------|-------------|
+| `/project:mass-scan <range>` | Fast mass port scanning with masscan + arp-scan |
+| `/project:web-fuzz <url>` | Web fuzzing: ffuf, wfuzz, arjun, nuclei, commix |
+| `/project:ad-audit <target>` | AD audit: crackmapexec, impacket, enum4linux, LDAP, Kerberos |
+
+### Analysis & Forensics
+
+| Command | Description |
+|---------|-------------|
+| `/project:sniff <target>` | Network sniffing: tcpdump capture + tshark analysis |
+| `/project:forensics <file>` | Digital forensics: binwalk, exiftool, steghide, foremost |
+| `/project:hash-crack <hash>` | Hash cracking: hash-identifier, john, hashcat, cewl |
 
 ## Authorization Policy
 
-Intrusive tools (sqlmap, hydra, john, metasploit) **always require user confirmation** before execution. This is enforced in both `AGENTS.md` and `CLAUDE.md`.
+Intrusive tools (sqlmap, hydra, john, metasploit) **always require user confirmation** before execution.
 
-When requesting a full audit, the agent asks for the engagement scope:
+Three authorization levels:
 
-1. **Passive only** — Reconnaissance and vulnerability identification
-2. **Passive + Credential testing** — Adds brute force with small wordlists
-3. **Full audit** — Includes sqlmap, metasploit, and all intrusive tests
+| Level | Tools allowed | Risk |
+|-------|--------------|------|
+| **Passive only** | nmap, gobuster, dirb, nikto, wpscan, enum4linux | None |
+| **Passive + Credentials** | + hydra with small wordlists | May trigger lockouts |
+| **Full pentest** | + sqlmap, metasploit, full brute force | May disrupt services |
 
-## Audit Workflow (Claude Code with sub-agents)
+## Compatibility
 
+| Agent | Instruction file | MCP | Parallel sub-agents | Session system |
+|-------|-----------------|-----|---------------------|----------------|
+| **Claude Code** | `CLAUDE.md` + `AGENTS.md` | Native | Yes | Yes |
+| **Gemini CLI** | `AGENTS.md` | Native | No | No |
+| **OpenCode** | `AGENTS.md` | Native | No | No |
+| **Cursor** | `AGENTS.md` | Native | No | No |
+| **GitHub Copilot** | `AGENTS.md` | Native | No | No |
+| **Codex (OpenAI)** | `AGENTS.md` | Native | No | No |
+| **Aider** | `AGENTS.md` | Native | No | No |
+| **Windsurf** | `AGENTS.md` | Native | No | No |
+| **goose** | `AGENTS.md` | Native | No | No |
+
+> **Note**: Parallel sub-agents and the session system (start/resume/finish) are Claude Code-exclusive features. Other agents execute the same methodology sequentially.
+
+### Manual MCP configuration
+
+Most agents auto-detect `.mcp.json`. If yours requires manual setup, point it to:
+
+```json
+{
+  "mcpServers": {
+    "kali": {
+      "type": "http",
+      "url": "http://localhost:666/mcp"
+    }
+  }
+}
 ```
-/audit 10.10.10.5
-        |
-        v
-   Phase 1: nmap -sV -sC -O
-        |
-        v
-   Displays ports and services
-        |
-        v
-   Asks for authorization level
-        |
-        v
-   Phase 2: Launches sub-agents in parallel
-        |
-        |-- Agent HTTP :80   -> nikto + gobuster + dirb + wpscan + sqlmap*
-        |-- Agent SSH :22    -> ssh scripts + hydra*
-        |-- Agent SMB :445   -> enum4linux + smb-vuln scripts
-        |-- Agent MySQL :3306 -> mysql scripts + hydra*
-        |-- Agent FTP :21    -> ftp scripts + hydra*
-        '-- ... (1 agent per port)
-        |
-        v                        (* depending on authorization)
-   Phase 3: Consolidated report
-        |
-        |-- Executive summary
-        |-- Findings by severity (Critical/High/Medium/Low)
-        |-- Port-by-port summary
-        |-- Chained attack paths
-        '-- Prioritized remediation roadmap
-```
-
-> With other agents (Gemini CLI, OpenCode, etc.) the workflow is identical but sequential: the agent audits each service one after another following the same methodology from `AGENTS.md`.
 
 ## Supported Services
 
-Each service has an audit playbook defined in `AGENTS.md`:
-
 | Service | Ports | Tools |
 |---------|-------|-------|
-| HTTP/HTTPS | 80, 443, 8080, 8443 | nikto, gobuster, dirb, wpscan, sqlmap |
+| HTTP/HTTPS | 80, 443, 8080, 8443 | nikto, gobuster, ffuf, wfuzz, dirb, wpscan, sqlmap, nuclei, whatweb, arjun, commix |
 | SSH | 22 | nmap ssh-scripts, hydra |
 | FTP | 21 | nmap ftp-scripts, hydra |
-| SMB/NetBIOS | 139, 445 | enum4linux, nmap smb-scripts |
+| SMB/NetBIOS | 139, 445 | enum4linux, crackmapexec, smbclient, nmap smb-scripts |
+| Active Directory | 88, 389, 636 | crackmapexec, impacket-*, ldapsearch, nmap scripts |
 | MySQL | 3306 | nmap mysql-scripts, hydra |
 | PostgreSQL | 5432 | nmap pgsql-scripts, hydra |
 | MSSQL | 1433 | nmap ms-sql-scripts, hydra |
 | SMTP | 25, 465, 587 | nmap smtp-scripts |
-| DNS | 53 | nmap dns-scripts, dig |
+| DNS | 53 | nmap dns-scripts, dig, fierce, dnsrecon |
 | RDP | 3389 | nmap rdp-scripts, hydra |
-| SNMP | 161 | nmap snmp-scripts |
-| LDAP | 389, 636 | nmap ldap-scripts |
-| Generic | any other | nmap --script safe, banner grab |
+| SNMP | 161 | nmap snmp-scripts, snmpwalk |
+| LDAP | 389, 636 | nmap ldap-scripts, ldapsearch |
+| Redis | 6379 | nmap redis-scripts, netcat |
+| MongoDB | 27017 | nmap mongodb-scripts, netcat |
+| Elasticsearch | 9200 | curl API queries |
+| Docker API | 2375, 2376 | curl API queries |
+| WinRM | 5985, 5986 | crackmapexec |
+| VNC | 5900-5910 | nmap vnc-scripts, hydra |
+| NFS | 2049 | nmap nfs-scripts, showmount |
+| Generic | any other | nmap --script safe, searchsploit, banner grab |
+
+## Repository Structure
+
+```
+kali-mcp/
+├── init.sh                  # Bootstrap: build, start, wait for readiness
+├── .mcp.json                # MCP endpoint config (auto-detected by agents)
+├── AGENTS.md                # Universal agent instructions
+├── CLAUDE.md                # Claude Code: session system + sub-agent architecture
+├── docker/
+│   ├── Dockerfile           # Kali Linux image with security tools
+│   ├── compose.yml          # Docker Compose service definition
+│   └── entrypoint.sh        # Starts Flask API + supergateway
+├── .claude/
+│   └── commands/            # Slash commands (Claude Code only)
+│       ├── start.md         # /start — Initialize session
+│       ├── resume.md        # /resume — Resume previous session
+│       ├── finish.md        # /finish — Finalize + consolidated report
+│       ├── pentest.md       # /pentest — Full pentest (10+ sub-agents)
+│       ├── audit.md         # /audit — Per-service audit
+│       ├── network-discovery.md  # /network-discovery — Host discovery
+│       ├── recon.md         # /recon — Passive reconnaissance
+│       ├── vuln-scan.md     # /vuln-scan — Vulnerability identification
+│       ├── web-audit.md     # /web-audit — Web application audit
+│       ├── wp-audit.md      # /wp-audit — WordPress audit
+│       ├── brute.md         # /brute — Brute force
+│       ├── exploit.md       # /exploit — Exploitation
+│       ├── osint.md         # /osint — OSINT reconnaissance
+│       ├── subdomain-enum.md # /subdomain-enum — Subdomain discovery
+│       ├── web-fuzz.md      # /web-fuzz — Web fuzzing (ffuf/wfuzz/nuclei)
+│       ├── ad-audit.md      # /ad-audit — Active Directory audit
+│       ├── mass-scan.md     # /mass-scan — Fast mass port scanning
+│       ├── sniff.md         # /sniff — Network traffic analysis
+│       ├── forensics.md     # /forensics — Digital forensics
+│       ├── hash-crack.md    # /hash-crack — Hash cracking
+│       └── waf-detect.md    # /waf-detect — WAF detection
+└── sessions/                # Session data (git-ignored)
+    └── <target>_<timestamp>/
+        ├── session.md
+        ├── targets.md
+        ├── findings.md
+        └── assets/
+```
 
 ## Troubleshooting
 
@@ -292,19 +413,19 @@ Each service has an audit playbook defined in `AGENTS.md`:
 |---------|----------|
 | `init.sh` hangs at "Waiting for MCP server" | Check Docker is running: `docker ps`. Inspect logs: `docker logs kali-mcp`. |
 | Agent can't connect to MCP | Verify the container is up: `curl http://localhost:666/mcp`. Restart with `./init.sh`. |
-| Port 666 already in use | Change the host port in `docker/compose.yml` (`"<new-port>:8000"`) and update `.mcp.json` accordingly. |
-| Image build fails | Ensure you have internet access. Kali repos may be temporarily unavailable — retry after a few minutes. |
-| Tools timeout on large scans | Some scans (full nmap, sqlmap) can take minutes. The container does not have resource limits by default — add them in `compose.yml` if needed. |
+| Port 666 already in use | Change the host port in `docker/compose.yml` (`"<new-port>:8000"`) and update `.mcp.json`. |
+| Image build fails | Ensure internet access. Kali repos may be temporarily unavailable — retry. |
+| Tools timeout on large scans | Some scans take minutes. Add resource limits in `compose.yml` if needed. |
 
 ## Disclaimer
 
-> **WARNING**: This toolkit is intended **exclusively** for authorized security testing. Misuse of these tools may violate local, national, and international laws.
+> **WARNING**: This toolkit is intended **exclusively** for authorized security testing. Misuse may violate local, national, and international laws.
 
 **You must ensure that:**
 
-- You have **explicit written authorization** from the system owner before testing any target.
+- You have **explicit written authorization** from the system owner before testing.
 - You are operating within the **agreed scope** of the engagement.
-- You understand that intrusive tools (sqlmap, hydra, metasploit) **can disrupt services**, corrupt data, or trigger security alerts.
+- You understand that intrusive tools **can disrupt services**, corrupt data, or trigger security alerts.
 
 **Acceptable use cases:**
 
@@ -313,7 +434,7 @@ Each service has an audit playbook defined in `AGENTS.md`:
 - Lab environments (HackTheBox, TryHackMe, VulnHub, personal labs)
 - Defensive security research
 
-**The authors of this project assume no liability for damages caused by misuse of this toolkit. You are solely responsible for your actions.**
+**The authors assume no liability for damages caused by misuse. You are solely responsible for your actions.**
 
 ## License
 

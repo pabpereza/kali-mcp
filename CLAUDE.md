@@ -18,7 +18,7 @@ Read `AGENTS.md` for the full project context: available MCP tools, authorizatio
 | `/project:pentest <target>` | Full pentest with max parallelism: 7+ specialized sub-agents per web target |
 | `/project:network-discovery <range>` | Host discovery, sub-agent per live host |
 
-### Standalone
+### Standalone Scans
 | Command | Description |
 |---------|-------------|
 | `/project:recon <target>` | Passive recon (nmap + gobuster + nikto) |
@@ -27,6 +27,27 @@ Read `AGENTS.md` for the full project context: available MCP tools, authorizatio
 | `/project:wp-audit <url>` | WordPress audit |
 | `/project:brute <target> <service>` | Brute force with hydra/john |
 | `/project:exploit <target> <vuln>` | Exploit a specific vulnerability |
+
+### OSINT & Reconnaissance
+| Command | Description |
+|---------|-------------|
+| `/project:osint <target>` | OSINT recon: whois, whatweb, theHarvester, fierce, dnsrecon, wafw00f |
+| `/project:subdomain-enum <domain>` | Subdomain enumeration: sublist3r, amass, fierce, dnsrecon, ffuf vhost |
+| `/project:waf-detect <url>` | WAF/IPS detection: wafw00f, nmap scripts, header analysis |
+
+### Advanced Scanning
+| Command | Description |
+|---------|-------------|
+| `/project:mass-scan <range>` | Fast mass port scanning with masscan + arp-scan |
+| `/project:web-fuzz <url>` | Web fuzzing: ffuf, wfuzz, arjun, nuclei, commix |
+| `/project:ad-audit <target>` | Active Directory audit: crackmapexec, impacket, enum4linux, LDAP |
+
+### Analysis & Forensics
+| Command | Description |
+|---------|-------------|
+| `/project:sniff <target>` | Network sniffing: tcpdump capture + tshark analysis |
+| `/project:forensics <file>` | Digital forensics: binwalk, exiftool, steghide, foremost |
+| `/project:hash-crack <hash>` | Hash cracking: hash-identifier, john, hashcat, cewl wordlists |
 
 ## Session System
 
@@ -80,14 +101,18 @@ For a web application target, the orchestrator launches up to **7 parallel sub-a
 
 | Sub-Agent | Mission | Scope Required |
 |-----------|---------|----------------|
-| Service Enumeration | Per-port service audit (nmap scripts, service-specific checks) | Passive |
-| Web Directory Enumeration | Discover hidden endpoints, files, directories | Passive |
+| Service Enumeration | Per-port service audit (nmap scripts, searchsploit, service-specific checks) | Passive |
+| Web Directory Enumeration | Discover hidden endpoints with gobuster, ffuf, dirb | Passive |
+| Web Fuzzing & Parameters | ffuf/wfuzz parameter discovery, arjun hidden params | Passive |
 | API Security Testing | Test API endpoints, IDOR, auth bypass, info disclosure | Passive |
 | Auth & Session Testing | SQLi on login, JWT analysis, credential testing | Passive |
-| Vulnerability Scanning | nmap vuln scripts, nikto, CVE identification | Passive |
-| Credential Brute Force | hydra, default creds, password spray | Credential+ |
+| Vulnerability Scanning | nmap vuln scripts, nikto, nuclei templates, CVE identification | Passive |
+| OSINT & Fingerprinting | whatweb, wafw00f, theHarvester, DNS recon | Passive |
+| Credential Brute Force | hydra, crackmapexec, default creds, password spray | Credential+ |
 | SQL Injection Exploitation | sqlmap, DB dump, data exfiltration | Full only |
+| Command Injection Testing | commix OS command injection detection and exploitation | Full only |
 | Sensitive File Discovery | FTP bypass, null byte, path traversal, key/log exposure | Full only |
+| AD/SMB Exploitation | impacket secretsdump, psexec, kerberoast, pass-the-hash | Full only |
 
 ### Sub-Agent Types for `/project:audit`
 
