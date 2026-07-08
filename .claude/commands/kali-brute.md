@@ -22,8 +22,8 @@ If the user selects "Cancel", stop immediately and suggest using `/project:recon
 
 1. **Parse arguments**: Extract target, service, and options.
 2. **Wordlist selection**: Use `/usr/share/wordlists/rockyou.txt` for passwords unless the user chose small wordlist (then use `/usr/share/wordlists/nmap.lst` or top 50).
-3. **Run Hydra**: Execute hydra_attack with the appropriate parameters.
-4. **Hash cracking** (if hash files provided): Use john_crack with appropriate format.
+3. **Run Hydra**: Execute `execute_command` (hydra) with the appropriate parameters.
+4. **Hash cracking** (if hash files provided): Use `execute_command` (john) with appropriate format.
 
 Report:
 - **Target**: IP/hostname and service tested

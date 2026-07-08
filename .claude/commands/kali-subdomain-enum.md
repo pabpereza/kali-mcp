@@ -15,7 +15,7 @@ You are a **subdomain enumeration specialist**. Discover as many subdomains as p
    - Run `mcp__kali__execute_command` with `dig axfr <domain> @<nameserver>` for zone transfer attempts against each NS.
 
 3. **Vhost Discovery** (if web server is known):
-   - Run `mcp__kali__gobuster_scan` in vhost mode against the target IP.
+   - Run `execute_command` (gobuster) in vhost mode against the target IP.
    - Run `mcp__kali__execute_command` with `ffuf -u http://<target_ip> -H "Host: FUZZ.<domain>" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -mc 200,301,302,403 -fs <common_size>` to fuzz virtual hosts.
 
 4. **Subdomain Validation**:

@@ -10,13 +10,13 @@ Before starting, use `AskUserQuestion` to ask the user:
 ## Workflow
 
 1. **WordPress Detection**: Verify WordPress by checking /wp-admin, /wp-login.php, /wp-content/.
-2. **WPScan Full Audit**: Run wpscan_analyze to enumerate:
+2. **WPScan Full Audit**: Run `execute_command` (wpscan) to enumerate:
    - WordPress version and known CVEs
    - Installed plugins and versions
    - Installed themes and versions
    - User enumeration
-3. **Directory Enumeration**: Run gobuster_scan to find additional exposed paths.
-4. **Brute Force** (FULL AUDIT only): If authorized, run hydra_attack against wp-login.php. If passive, skip and note "Skipped - requires full audit authorization".
+3. **Directory Enumeration**: Run `execute_command` (gobuster) to find additional exposed paths.
+4. **Brute Force** (FULL AUDIT only): If authorized, run `execute_command` (hydra) against wp-login.php. If passive, skip and note "Skipped - requires full audit authorization".
 
 Report:
 - **WordPress Version**: Version and associated CVEs

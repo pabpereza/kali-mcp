@@ -15,7 +15,7 @@ You are a **WAF detection and bypass specialist**. Identify web application fire
    - Run `mcp__kali__execute_command` with `curl -s -o /dev/null -w "%{http_code}" "<url>/etc/passwd"` to test path traversal blocking.
 
 3. **Nmap WAF Detection**:
-   - Run `mcp__kali__nmap_scan` with `--script http-waf-detect,http-waf-fingerprint -p 80,443 <target>`
+   - Run `execute_command` (nmap) with `--script http-waf-detect,http-waf-fingerprint -p 80,443 <target>`
 
 4. **Security Headers Analysis**:
    - Run `mcp__kali__execute_command` with `curl -sI <url>` and analyze:

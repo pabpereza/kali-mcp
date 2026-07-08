@@ -64,7 +64,25 @@ RUN apt-get update && \
     libimage-exiftool-perl \
     # --- Wordlists ---
     seclists \
+    wordlists \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Ensure rockyou.txt is present and decompressed at the canonical path.
+# The `wordlists` package ships it gzipped; several tools/prompts expect the
+# plaintext file at /usr/share/wordlists/rockyou.txt.
+RUN if [ -f /usr/share/wordlists/rockyou.txt.gz ]; then \
+        gunzip -k /usr/share/wordlists/rockyou.txt.gz; \
+    fi && \
+    if [ ! -f /usr/share/wordlists/rockyou.txt ] && \
+       [ -f /usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt.tar.gz ]; then \
+        tar -xzf /usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt.tar.gz \
+            -C /usr/share/wordlists/; \
+    fi
+
+# Refresh offline exploit/vuln databases at build time so runs don't depend on
+# whatever the apt snapshot shipped.
+RUN searchsploit -u || true && \
+    nuclei -update-templates || true
 
 RUN npm install -g supergateway
 

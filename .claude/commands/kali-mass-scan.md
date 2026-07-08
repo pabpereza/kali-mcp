@@ -34,7 +34,7 @@ Before starting, use `AskUserQuestion` to ask:
 ## Phase 3: Service Verification with nmap
 
 For each discovered host (or top hosts if range is large):
-1. Run `mcp__kali__nmap_scan` with `-sV -sC -p <discovered_ports> <host>` to verify services and get versions.
+1. Run `execute_command` (nmap) with `-sV -sC -p <discovered_ports> <host>` to verify services and get versions.
 2. Only scan the ports that masscan found open (targeted, not full scan).
 
 ## Phase 4: ARP Scan (local network)

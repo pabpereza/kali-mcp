@@ -39,7 +39,7 @@ Before starting, use `AskUserQuestion` to ask:
 ## Phase 3: Cracking with John the Ripper
 
 1. **John Cracking** (quick):
-   - Run `mcp__kali__john_crack` with the hash file and appropriate format:
+   - Run `execute_command` (john) with the hash file and appropriate format:
      - MD5: `--format=raw-md5`
      - SHA1: `--format=raw-sha1`
      - SHA256: `--format=raw-sha256`
@@ -50,10 +50,10 @@ Before starting, use `AskUserQuestion` to ask:
      - SHA512crypt: `--format=sha512crypt`
 
 2. **John with Wordlist**:
-   - Run `mcp__kali__john_crack` with `--wordlist=/usr/share/wordlists/rockyou.txt`
+   - Run `execute_command` (john) with `--wordlist=/usr/share/wordlists/rockyou.txt`
 
 3. **John with Rules** (full scope):
-   - Run `mcp__kali__john_crack` with `--wordlist=/usr/share/wordlists/rockyou.txt --rules=best64`
+   - Run `execute_command` (john) with `--wordlist=/usr/share/wordlists/rockyou.txt --rules=best64`
 
 4. **Show Results**:
    - Run `mcp__kali__execute_command` with `john --show /tmp/workspace/hash.txt`

@@ -9,11 +9,11 @@ Before starting, use `AskUserQuestion` to ask the user:
 
 ## Workflow
 
-1. **Web Server Fingerprinting**: Run nikto_scan against the target URL.
-2. **Directory Enumeration**: Run gobuster_scan in dir mode to discover hidden directories and files.
-3. **Content Discovery**: Run dirb_scan for additional content discovery.
-4. **WordPress Detection**: If WordPress is detected, run wpscan_analyze.
-5. **SQL Injection Testing** (FULL AUDIT only): For discovered pages with URL parameters, run sqlmap_scan. If authorization is passive, skip and note "Skipped - requires full audit authorization".
+1. **Web Server Fingerprinting**: Run `execute_command` (nikto) against the target URL.
+2. **Directory Enumeration**: Run `execute_command` (gobuster) in dir mode to discover hidden directories and files.
+3. **Content Discovery**: Run `execute_command` (dirb) for additional content discovery.
+4. **WordPress Detection**: If WordPress is detected, run `execute_command` (wpscan).
+5. **SQL Injection Testing** (FULL AUDIT only): For discovered pages with URL parameters, run `execute_command` (sqlmap). If authorization is passive, skip and note "Skipped - requires full audit authorization".
 
 Report:
 - **Target**: URL, web server, technologies detected

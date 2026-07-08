@@ -37,28 +37,41 @@ Before Phase 2, after showing the port summary, use `AskUserQuestion` to ask the
 Then inject the chosen authorization level into every sub-agent prompt as:
 ```
 AUTHORIZATION LEVEL: <chosen_level>
-- If PASSIVE ONLY: Do NOT run hydra_attack, sqlmap_scan, metasploit_run, or any tool that attempts authentication or sends exploit payloads. Skip those steps and note them as "Skipped - requires intrusive authorization".
-- If PASSIVE + CREDENTIAL TESTING: You MAY run hydra_attack with small wordlists. Do NOT run sqlmap_scan or metasploit_run.
-- If FULL AUDIT: You MAY run all tools including hydra_attack, sqlmap_scan, and metasploit_run.
+- If PASSIVE ONLY: Do NOT run `execute_command` (hydra), `execute_command` (sqlmap), `execute_command` (msfconsole), or any tool that attempts authentication or sends exploit payloads. Skip those steps and note them as "Skipped - requires intrusive authorization".
+- If PASSIVE + CREDENTIAL TESTING: You MAY run `execute_command` (hydra) with small wordlists. Do NOT run `execute_command` (sqlmap) or `execute_command` (msfconsole).
+- If FULL AUDIT: You MAY run all tools including `execute_command` (hydra), `execute_command` (sqlmap), and `execute_command` (msfconsole).
 ```
 
 ## Phase 1: Discovery (you do this yourself)
 
-1. Run `nmap_scan` against the target with version detection (`-sV`), OS detection, and default scripts (`-sC`). Scan common ports unless the user specifies otherwise.
-2. Parse the nmap results carefully. Build a list of every open port with its service name and version.
-3. Print a summary table of discovered ports and services.
-4. Ask the user for the authorization level (see Authorization Policy above).
+1. **Fast pass (blocking):** Run `execute_command` with `nmap -sV -sC -Pn --top-ports 1000 -T4 <target>`. Use `-Pn` by default (many hosts drop ping). Add `-O` for OS detection (the container has NET_RAW/NET_ADMIN, so raw-socket scans work via `execute_command`). This gives you enough to start Wave A quickly.
+2. **Full pass (background):** Also kick off `execute_command` with `nmap -p- -T4 -Pn <target>` in the background to catch high/uncommon ports. Fold any extra open ports into the target list and dispatch late sub-agents for them if found.
+3. Parse the nmap results carefully. Build a list of every open port with its service name and version.
+4. Print a summary table of discovered ports and services.
+5. Ask the user for the authorization level (see Authorization Policy above).
 
-## Phase 2: Parallel Sub-Agent Dispatch
+## Phase 2: Parallel Sub-Agent Dispatch (two waves — loot before exploitation)
 
-Based on the discovered ports, launch **one sub-agent per port/service** using the `Agent` tool. Launch ALL sub-agents in a single message so they run in parallel. Use `subagent_type: "general-purpose"` for all of them.
+Dispatch happens in **two waves** so that credentials/secrets found by one service can be reused against the others. This avoids the classic waste of one agent blindly brute-forcing a service while another agent has already looted valid credentials for it.
+
+### Wave A — Recon & Loot (always, parallel)
+Launch **one sub-agent per port/service** in a SINGLE message. In this wave, sub-agents run ONLY passive recon and looting: enumeration, version/CVE ID, directory discovery, anonymous access, config/backup/capture/secret harvesting. They **do NOT** brute force, run sqlmap, or send exploit payloads yet — even under Full-audit authorization. Every Wave-A agent MUST end its report with a explicit **`HARVESTED CREDENTIALS:`** section (usernames, passwords, hashes, tokens, key files, hostnames) or `HARVESTED CREDENTIALS: none`.
+
+### Credential Broker (orchestrator, between waves)
+When Wave A returns, collect every `HARVESTED CREDENTIALS` block into a single consolidated credential set. Save it to `sessions/<SESSION_DIR>/assets/harvested_credentials.md`. This set is injected into Wave B.
+
+### Wave B — Exploitation (only if authorization > Passive, parallel)
+Launch the intrusive sub-agents (credential spray, sqlmap, exploit verification) in a SINGLE message, **seeding each prompt with the harvested credential set first** so they try known credentials before any wordlist. A brute-force agent MUST test harvested credentials across ALL login services (password reuse is the most common finding) and stop the moment one valid pair is found. If Wave A already yielded working credentials for a service, do NOT brute-force that service — just confirm and pivot. Skip Wave B entirely for Passive-only engagements.
 
 Use the service classification below to build each sub-agent's prompt. Every sub-agent prompt MUST include:
 - The target IP/hostname
 - The specific port number
 - The service name and version detected
 - The detailed instructions from the matching category below
+- **TOOLING DIRECTIVE**: `Run ALL tools via the mcp__kali__execute_command tool, invoking the raw binary directly (nmap, nikto, gobuster, hydra, sqlmap, ...). Do NOT call the deprecated wrapper tools (nmap_scan, nikto_scan, hydra_attack, etc.) — they return HTTP 500. Load execute_command via ToolSearch first: query "select:mcp__kali__execute_command". Keep intrusive runs bounded (-t 4 -f, small/head-trimmed wordlists, or a single known credential).`
 - **SESSION OUTPUT instruction**: `When you finish, use the Write tool to save your COMPLETE output (all commands run, raw output, and findings) to: sessions/<SESSION_DIR>/assets/audit_<service>_port<PORT>.md`
+- **(Wave A only) LOOT instruction**: `End your report with a HARVESTED CREDENTIALS section listing every username, password, hash, token, key file, or hostname you recovered (or "HARVESTED CREDENTIALS: none"). Do NOT brute force or run exploit payloads in this wave — only passive recon and looting.`
+- **(Wave B only) CREDENTIAL SEED**: `Prepend the consolidated harvested credential set. Test these known credentials against this service FIRST (and note password reuse); only fall back to a small bounded wordlist if none work.`
 
 ### Service Categories and Sub-Agent Prompts:
 
@@ -66,13 +79,13 @@ Use the service classification below to build each sub-agent's prompt. Every sub
 ```
 Audit the web service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nikto_scan against http(s)://<TARGET>:<PORT> to find web server vulnerabilities.
-2. Run gobuster_scan in dir mode against http(s)://<TARGET>:<PORT> to enumerate directories and files.
-3. Run dirb_scan against http(s)://<TARGET>:<PORT> for additional content discovery.
+1. Run `execute_command` (nikto) against http(s)://<TARGET>:<PORT> to find web server vulnerabilities.
+2. Run `execute_command` (gobuster) in dir mode against http(s)://<TARGET>:<PORT> to enumerate directories and files.
+3. Run `execute_command` (dirb) against http(s)://<TARGET>:<PORT> for additional content discovery.
 4. Check for common files: robots.txt, sitemap.xml, .git/, .env, wp-login.php, /admin, /api.
-5. If WordPress is detected (wp-content, wp-admin, wp-login.php in any results), run wpscan_analyze.
-6. For any discovered pages with URL parameters, run sqlmap_scan to test for SQL injection.
-7. Check for SSL/TLS issues if HTTPS using: nmap_scan with --script ssl-enum-ciphers,ssl-heartbleed.
+5. If WordPress is detected (wp-content, wp-admin, wp-login.php in any results), run `execute_command` (wpscan).
+6. For any discovered pages with URL parameters, run `execute_command` (sqlmap) to test for SQL injection.
+7. Check for SSL/TLS issues if HTTPS using: `execute_command` (nmap) with --script ssl-enum-ciphers,ssl-heartbleed.
 Provide a structured report with all findings, vulnerabilities categorized by severity, and remediation advice.
 ```
 
@@ -80,10 +93,10 @@ Provide a structured report with all findings, vulnerabilities categorized by se
 ```
 Audit the SSH service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script ssh-auth-methods,ssh-hostkey,ssh2-enum-algos.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script ssh-auth-methods,ssh-hostkey,ssh2-enum-algos.
 2. Check for weak algorithms (CBC ciphers, SHA1 MACs, weak key exchange).
 3. Check the SSH version for known CVEs (e.g., OpenSSH < 8.x vulnerabilities).
-4. Attempt default credential check with hydra_attack using username "root" and a small common password list. Use password_file /usr/share/wordlists/nmap.lst or similar small list.
+4. Attempt default credential check with `execute_command` (hydra) using username "root" and a small common password list. Use password_file /usr/share/wordlists/nmap.lst or similar small list.
 5. Check for username enumeration vulnerabilities (CVE-2018-15473 for OpenSSH < 7.7).
 Provide a report with: version analysis, weak algorithms found, credential test results, CVEs applicable, and hardening recommendations.
 ```
@@ -92,11 +105,11 @@ Provide a report with: version analysis, weak algorithms found, credential test 
 ```
 Audit the FTP service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script ftp-anon,ftp-bounce,ftp-syst,ftp-vsftpd-backdoor,ftp-proftpd-backdoor.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script ftp-anon,ftp-bounce,ftp-syst,ftp-vsftpd-backdoor,ftp-proftpd-backdoor.
 2. Check for anonymous login access.
 3. Check the FTP version for known CVEs and backdoors.
 4. If anonymous access is available, list accessible files using execute_command with: curl -s ftp://<TARGET>/
-5. Attempt common credential brute force with hydra_attack using small common username/password lists.
+5. Attempt common credential brute force with `execute_command` (hydra) using small common username/password lists.
 Provide a report with: anonymous access status, version vulnerabilities, accessible files, credential test results, and recommendations.
 ```
 
@@ -104,8 +117,8 @@ Provide a report with: anonymous access status, version vulnerabilities, accessi
 ```
 Audit the SMB service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run enum4linux_scan against <TARGET> for full SMB enumeration (shares, users, groups, policies).
-2. Run nmap_scan with scripts: --script smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067.
+1. Run `execute_command` (enum4linux) against <TARGET> for full SMB enumeration (shares, users, groups, policies).
+2. Run `execute_command` (nmap) with scripts: --script smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067.
 3. Check for null session access.
 4. Check for EternalBlue (MS17-010) and other critical SMB vulnerabilities.
 5. List accessible shares and their permissions.
@@ -116,10 +129,10 @@ Provide a report with: shares found, users enumerated, null session status, vuln
 ```
 Audit the MySQL service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script mysql-info,mysql-enum,mysql-empty-password,mysql-vuln-cve2012-2122.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script mysql-info,mysql-enum,mysql-empty-password,mysql-vuln-cve2012-2122.
 2. Check for empty/default root password.
 3. Check MySQL version for known CVEs.
-4. Attempt common credential test with hydra_attack for mysql service with common usernames (root, admin, mysql).
+4. Attempt common credential test with `execute_command` (hydra) for mysql service with common usernames (root, admin, mysql).
 5. If access is gained, enumerate databases using execute_command.
 Provide a report with: version info, authentication weaknesses, CVEs found, credential test results, and hardening recommendations.
 ```
@@ -128,9 +141,9 @@ Provide a report with: version info, authentication weaknesses, CVEs found, cred
 ```
 Audit the PostgreSQL service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script pgsql-brute.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script pgsql-brute.
 2. Check PostgreSQL version for known CVEs.
-3. Attempt default credential test with hydra_attack for postgres service (users: postgres, admin).
+3. Attempt default credential test with `execute_command` (hydra) for postgres service (users: postgres, admin).
 4. Check if the service accepts connections without SSL.
 Provide a report with: version analysis, authentication test results, CVEs, and security recommendations.
 ```
@@ -139,10 +152,10 @@ Provide a report with: version analysis, authentication test results, CVEs, and 
 ```
 Audit the MSSQL service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script ms-sql-info,ms-sql-empty-password,ms-sql-ntlm-info,ms-sql-brute.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script ms-sql-info,ms-sql-empty-password,ms-sql-ntlm-info,ms-sql-brute.
 2. Check for default SA account with empty/common passwords.
 3. Check MSSQL version for known CVEs.
-4. Attempt credential test with hydra_attack for mssql service.
+4. Attempt credential test with `execute_command` (hydra) for mssql service.
 Provide a report with: version info, authentication weaknesses, CVEs, and hardening steps.
 ```
 
@@ -150,7 +163,7 @@ Provide a report with: version info, authentication weaknesses, CVEs, and harden
 ```
 Audit the SMTP service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script smtp-commands,smtp-enum-users,smtp-open-relay,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script smtp-commands,smtp-enum-users,smtp-open-relay,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720.
 2. Check for open relay configuration.
 3. Attempt user enumeration via VRFY/EXPN/RCPT TO.
 4. Check SMTP version for known CVEs.
@@ -161,7 +174,7 @@ Provide a report with: supported commands, open relay status, enumerated users, 
 ```
 Audit the DNS service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script dns-zone-transfer,dns-recursion,dns-cache-snoop,dns-nsid.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script dns-zone-transfer,dns-recursion,dns-cache-snoop,dns-nsid.
 2. Attempt zone transfer using execute_command: dig axfr @<TARGET> <domain> (if domain is known).
 3. Check if recursion is enabled (open resolver).
 4. Check DNS version for known CVEs.
@@ -172,11 +185,11 @@ Provide a report with: zone transfer results, recursion status, version info, an
 ```
 Audit the RDP service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script rdp-enum-encryption,rdp-vuln-ms12-020,rdp-ntlm-info.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script rdp-enum-encryption,rdp-vuln-ms12-020,rdp-ntlm-info.
 2. Check for BlueKeep (CVE-2019-0708) vulnerability.
 3. Check for MS12-020 vulnerability.
 4. Check NLA (Network Level Authentication) status.
-5. Attempt credential test with hydra_attack for rdp service with common credentials.
+5. Attempt credential test with `execute_command` (hydra) for rdp service with common credentials.
 Provide a report with: encryption level, NLA status, vulnerabilities found (especially BlueKeep), and hardening steps.
 ```
 
@@ -184,7 +197,7 @@ Provide a report with: encryption level, NLA status, vulnerabilities found (espe
 ```
 Audit the SNMP service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> (UDP scan -sU) with scripts: --script snmp-info,snmp-brute,snmp-interfaces,snmp-processes,snmp-sysdescr.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> (UDP scan -sU) with scripts: --script snmp-info,snmp-brute,snmp-interfaces,snmp-processes,snmp-sysdescr.
 2. Test default community strings (public, private, community).
 3. Enumerate system information via SNMP if accessible.
 Provide a report with: community strings found, system info exposed, and security recommendations.
@@ -194,7 +207,7 @@ Provide a report with: community strings found, system info exposed, and securit
 ```
 Audit the LDAP service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with scripts: --script ldap-rootdse,ldap-search,ldap-brute.
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with scripts: --script ldap-rootdse,ldap-search,ldap-brute.
 2. Check for anonymous bind access.
 3. Enumerate base DN and directory structure if accessible.
 4. Check for LDAPS (secure) vs plain LDAP.
@@ -205,7 +218,7 @@ Provide a report with: anonymous access status, directory info exposed, protocol
 ```
 Audit the service on <TARGET>:<PORT> (<SERVICE_VERSION>).
 Use the Kali MCP tools to perform these steps:
-1. Run nmap_scan against <TARGET> port <PORT> with version detection (-sV) and all safe scripts (--script safe).
+1. Run `execute_command` (nmap) against <TARGET> port <PORT> with version detection (-sV) and all safe scripts (--script safe).
 2. Research the service version for known CVEs using execute_command with searchsploit if available.
 3. Attempt banner grabbing using execute_command: nc -nv <TARGET> <PORT> or curl.
 Provide a report with: service details, version analysis, any vulnerabilities found, and recommendations.

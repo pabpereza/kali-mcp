@@ -4,15 +4,15 @@ This is a **passive reconnaissance** skill. It does NOT perform brute force, exp
 
 Follow this workflow step by step:
 
-1. **Port Scan**: Run nmap_scan with version detection (-sV) and default scripts (-sC) on the target.
+1. **Port Scan**: Run `execute_command` (nmap) with version detection (-sV) and default scripts (-sC) on the target.
 2. **Service Analysis**: Analyze the nmap results. Build a table of every open port with service name and version.
 3. **Web Technology Fingerprinting**: Run `execute_command` with `whatweb -a 3 <target>` to identify web technologies, CMS, frameworks.
 4. **WAF Detection**: Run `execute_command` with `wafw00f <target>` to detect WAF/IPS.
-5. **Web Discovery**: If HTTP/HTTPS services are found, run gobuster_scan and `execute_command` with `ffuf -u <url>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,301,302,403 -t 40` for fast directory fuzzing.
-6. **Web Server Scan**: For each web service, run nikto_scan to identify misconfigurations and known vulnerabilities.
+5. **Web Discovery**: If HTTP/HTTPS services are found, run `execute_command` (gobuster) and `execute_command` with `ffuf -u <url>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,301,302,403 -t 40` for fast directory fuzzing.
+6. **Web Server Scan**: For each web service, run `execute_command` (nikto) to identify misconfigurations and known vulnerabilities.
 7. **Nuclei Scan**: Run `execute_command` with `nuclei -u <url> -severity critical,high -c 20` for template-based vulnerability detection.
-8. **SMB Enumeration**: If SMB/NetBIOS ports are found (139, 445), run enum4linux_scan and `execute_command` with `crackmapexec smb <target> --shares`.
-9. **SSL/TLS Check**: For HTTPS services, run nmap_scan with --script ssl-enum-ciphers,ssl-heartbleed.
+8. **SMB Enumeration**: If SMB/NetBIOS ports are found (139, 445), run `execute_command` (enum4linux) and `execute_command` with `crackmapexec smb <target> --shares`.
+9. **SSL/TLS Check**: For HTTPS services, run `execute_command` (nmap) with --script ssl-enum-ciphers,ssl-heartbleed.
 10. **Exploit Research**: For each service/version found, run `execute_command` with `searchsploit <service> <version>` to check for known exploits.
 
 After completing all scans, provide a structured summary with:

@@ -8,25 +8,30 @@ The Kali container exposes MCP at `http://localhost:666/mcp`. The container must
 
 ## Available MCP Tools
 
-### Native MCP Tools (direct API)
-| Tool | Function | Intrusive |
-|------|----------|-----------|
-| `nmap_scan` | Port scanning, version/OS detection, NSE scripts | No |
-| `gobuster_scan` | Directory, DNS, and vhost enumeration | No |
-| `dirb_scan` | Web content discovery | No |
-| `nikto_scan` | Web server vulnerability scanning | No |
-| `wpscan_analyze` | WordPress vulnerability scanning | No |
-| `enum4linux_scan` | Windows/Samba enumeration | No |
-| `sqlmap_scan` | SQL injection detection and exploitation | **Yes** |
-| `hydra_attack` | Password brute force (SSH, FTP, HTTP, etc.) | **Yes** |
-| `john_crack` | Password hash cracking | **Yes** |
-| `metasploit_run` | Metasploit module execution | **Yes** |
-| `execute_command` | Arbitrary command on Kali container | Depends |
-| `server_health` | Health check | No |
+> ⚠️ **TOOLING DIRECTIVE — read first.**
+> **Run EVERY tool through the single `execute_command` MCP tool, invoking the raw binary directly** (e.g. `execute_command` with `nmap -sV -sC <target>`).
+> The dedicated wrapper tools (nmap_scan, gobuster_scan, dirb_scan, nikto_scan, wpscan_analyze, enum4linux_scan, sqlmap_scan, hydra_attack, john_crack, metasploit_run) are **DEPRECATED**: they proxy the same binaries but add an unreliable server-side health check that has been returning **HTTP 500**, and they hide flags you often need. **Do not call them.** `server_health` is optional and diagnostic only.
+> This keeps one code path, exposes the full flag surface of each tool, and avoids the wrapper's failure mode.
+
+### Canonical command mapping (deprecated wrapper → run via `execute_command`)
+| Instead of the wrapper… | Run via `execute_command` |
+|-------------------------|----------------------------|
+| `nmap_scan` | `nmap -sV -sC -Pn <target>` (add `--script <nse>`, `-p <ports>`, `-sU`, etc.) |
+| `gobuster_scan` | `gobuster dir -u <url> -w <wordlist> -t 30 -q` |
+| `dirb_scan` | `dirb <url> <wordlist>` |
+| `nikto_scan` | `nikto -h <url> -maxtime 120s` |
+| `wpscan_analyze` | `wpscan --url <url> --enumerate vp,vt,u --no-banner` |
+| `enum4linux_scan` | `enum4linux -a <target>` |
+| `sqlmap_scan` | `sqlmap -u "<url>" --batch --level=2 --risk=2` (add `--data`, `--cookie`) |
+| `hydra_attack` | `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` |
+| `john_crack` | `john --wordlist=<wordlist> <hashfile>` |
+| `metasploit_run` | `msfconsole -q -x "<commands>; exit"` |
+
+> **Bound intrusive runs.** For brute force / cracking always cap the attempt window (`-t 4 -f`, a small/`head`-trimmed wordlist, a single known credential when one is already harvested) so a run finishes in seconds, not hours. Never launch an unbounded `rockyou` sweep.
 
 ### Tools via `execute_command`
 
-These tools are installed in the container and accessed via `execute_command`:
+These tools are installed in the container and accessed via `execute_command` (same path as everything above):
 
 #### Reconnaissance & OSINT
 | Tool | Command | Function |
@@ -100,8 +105,9 @@ These tools are installed in the container and accessed via `execute_command`:
 
 **Always ask the user for confirmation before running intrusive tools.** Passive tools can be run freely.
 
-- **Passive (always allowed)**: nmap_scan, gobuster_scan, dirb_scan, nikto_scan, wpscan_analyze, enum4linux_scan, server_health. Via execute_command: whatweb, theHarvester, fierce, dnsrecon, amass, sublist3r, wafw00f, whois, dig, ffuf, wfuzz, arjun, nuclei, masscan, arp-scan, snmpwalk, tcpdump, tshark, binwalk, foremost, exiftool, hash-identifier, searchsploit, crackmapexec (enum only), smbclient (read only).
-- **Intrusive (ask first)**: sqlmap_scan, hydra_attack, john_crack, metasploit_run. Via execute_command: commix, responder (active mode), crackmapexec (with credentials), impacket-* (exploitation), hashcat, cewl (against target sites), crunch, steghide (extraction).
+All tools run via `execute_command`; the classification is by tool, not by MCP entrypoint.
+- **Passive (always allowed)**: nmap (scanning/NSE), gobuster, dirb, nikto, wpscan, enum4linux, whatweb, theHarvester, fierce, dnsrecon, amass, sublist3r, wafw00f, whois, dig, ffuf, wfuzz, arjun, nuclei, masscan, arp-scan, snmpwalk, tcpdump, tshark, binwalk, foremost, exiftool, hash-identifier, searchsploit, crackmapexec (enum only), smbclient (read only).
+- **Intrusive (ask first)**: sqlmap, hydra, john, msfconsole (metasploit), commix, responder (active mode), crackmapexec (with credentials), impacket-* (exploitation), hashcat, cewl (against target sites), crunch, steghide (extraction).
 
 When the user requests a full audit, ask for the authorization level before proceeding:
 1. **Passive only** — Scanning and vulnerability identification. No brute force, no exploitation.
@@ -113,71 +119,71 @@ When the user requests a full audit, ask for the authorization level before proc
 When asked to audit a target, follow this workflow:
 
 ### Step 1: Service Discovery
-Run `nmap_scan` with version detection (`-sV`), default scripts (`-sC`), and OS detection against the target. Parse the results to identify every open port, service name, and version.
+Run `execute_command` with `nmap -sV -sC -Pn <target>` (add `-O` for OS detection when running privileged). Parse the results to identify every open port, service name, and version.
 
 ### Step 2: Per-Service Analysis
 For each discovered service, run the appropriate tools:
 
 **HTTP/HTTPS** (80, 443, 8080, 8443, or any http service):
-- Run `nikto_scan` against the URL
-- Run `gobuster_scan` in dir mode for directory enumeration
-- Run `dirb_scan` for additional content discovery
-- If WordPress detected, run `wpscan_analyze`
-- If authorized: run `sqlmap_scan` on discovered URL parameters
-- For HTTPS: run `nmap_scan` with `--script ssl-enum-ciphers,ssl-heartbleed`
+- Run `execute_command`: `nikto -h <url>` against the URL
+- Run `execute_command`: `gobuster dir -u <url> -w <wordlist> -t 30 -q` in dir mode for directory enumeration
+- Run `execute_command`: `dirb <url>` for additional content discovery
+- If WordPress detected, run `execute_command`: `wpscan --url <url> --enumerate vp,vt,u --no-banner`
+- If authorized: run `execute_command`: `sqlmap -u "<url>" --batch --level=2 --risk=2` on discovered URL parameters
+- For HTTPS: run `execute_command`: `nmap -Pn <target> --script ssl-enum-ciphers,ssl-heartbleed`
 
 **SSH** (22 or any ssh service):
-- Run `nmap_scan` with `--script ssh-auth-methods,ssh-hostkey,ssh2-enum-algos`
+- Run `execute_command`: `nmap -Pn <target> --script ssh-auth-methods,ssh-hostkey,ssh2-enum-algos`
 - Check version for known CVEs
-- If authorized: run `hydra_attack` with small wordlist
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` with small wordlist
 
 **FTP** (21 or any ftp service):
-- Run `nmap_scan` with `--script ftp-anon,ftp-bounce,ftp-syst,ftp-vsftpd-backdoor,ftp-proftpd-backdoor`
+- Run `execute_command`: `nmap -Pn <target> --script ftp-anon,ftp-bounce,ftp-syst,ftp-vsftpd-backdoor,ftp-proftpd-backdoor`
 - Check for anonymous access
-- If authorized: run `hydra_attack` with common credentials
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` with common credentials
 
 **SMB/NetBIOS** (139, 445):
-- Run `enum4linux_scan` for full enumeration
-- Run `nmap_scan` with `--script smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067`
+- Run `execute_command`: `enum4linux -a <target>` for full enumeration
+- Run `execute_command`: `nmap -Pn <target> --script smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067`
 
 **MySQL** (3306):
-- Run `nmap_scan` with `--script mysql-info,mysql-enum,mysql-empty-password,mysql-vuln-cve2012-2122`
-- If authorized: run `hydra_attack` for mysql with common usernames
+- Run `execute_command`: `nmap -Pn <target> --script mysql-info,mysql-enum,mysql-empty-password,mysql-vuln-cve2012-2122`
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` for mysql with common usernames
 
 **PostgreSQL** (5432):
-- Run `nmap_scan` with `--script pgsql-brute`
-- If authorized: run `hydra_attack` for postgres service
+- Run `execute_command`: `nmap -Pn <target> --script pgsql-brute`
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` for postgres service
 
 **MSSQL** (1433):
-- Run `nmap_scan` with `--script ms-sql-info,ms-sql-empty-password,ms-sql-ntlm-info,ms-sql-brute`
-- If authorized: run `hydra_attack` for mssql service
+- Run `execute_command`: `nmap -Pn <target> --script ms-sql-info,ms-sql-empty-password,ms-sql-ntlm-info,ms-sql-brute`
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` for mssql service
 
 **SMTP** (25, 465, 587):
-- Run `nmap_scan` with `--script smtp-commands,smtp-enum-users,smtp-open-relay,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720`
+- Run `execute_command`: `nmap -Pn <target> --script smtp-commands,smtp-enum-users,smtp-open-relay,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720`
 
 **DNS** (53):
-- Run `nmap_scan` with `--script dns-zone-transfer,dns-recursion,dns-cache-snoop,dns-nsid`
+- Run `execute_command`: `nmap -Pn <target> --script dns-zone-transfer,dns-recursion,dns-cache-snoop,dns-nsid`
 - Attempt zone transfer with `execute_command`: `dig axfr @<target>`
 
 **RDP** (3389):
-- Run `nmap_scan` with `--script rdp-enum-encryption,rdp-vuln-ms12-020,rdp-ntlm-info`
+- Run `execute_command`: `nmap -Pn <target> --script rdp-enum-encryption,rdp-vuln-ms12-020,rdp-ntlm-info`
 - Check for BlueKeep (CVE-2019-0708)
 
 **SNMP** (161):
-- Run `nmap_scan` with `-sU --script snmp-info,snmp-brute,snmp-interfaces,snmp-sysdescr`
+- Run `execute_command`: `nmap -Pn <target> -sU --script snmp-info,snmp-brute,snmp-interfaces,snmp-sysdescr`
 
 **LDAP** (389, 636):
-- Run `nmap_scan` with `--script ldap-rootdse,ldap-search,ldap-brute`
+- Run `execute_command`: `nmap -Pn <target> --script ldap-rootdse,ldap-search,ldap-brute`
 - Check for anonymous bind
 
 **Kerberos** (88):
-- Run `nmap_scan` with `--script krb5-enum-users` to enumerate valid usernames
+- Run `execute_command`: `nmap -Pn <target> --script krb5-enum-users` to enumerate valid usernames
 - Run `execute_command` with `impacket-GetNPUsers <domain>/ -usersfile users.txt -no-pass` for AS-REP Roasting
 - If credentials available: `impacket-GetUserSPNs <domain>/<user>:<pass> -request` for Kerberoasting
 
 **VNC** (5900-5910):
-- Run `nmap_scan` with `--script vnc-info,vnc-brute,realvnc-auth-bypass`
-- If authorized: run `hydra_attack` for VNC service
+- Run `execute_command`: `nmap -Pn <target> --script vnc-info,vnc-brute,realvnc-auth-bypass`
+- If authorized: run `execute_command`: `hydra -L <users> -P <pass> -t 4 -f <service>://<target>` for VNC service
 
 **Redis** (6379):
 - Run `execute_command` with `nmap --script redis-info,redis-brute -p 6379 <target>`
@@ -202,11 +208,11 @@ For each discovered service, run the appropriate tools:
 - If credentials: `crackmapexec winrm <target> -u <user> -p <pass> -x "whoami"`
 
 **NFS** (2049):
-- Run `nmap_scan` with `--script nfs-ls,nfs-showmount,nfs-statfs -p 2049`
+- Run `execute_command`: `nmap -Pn <target> --script nfs-ls,nfs-showmount,nfs-statfs -p 2049`
 - Run `execute_command` with `showmount -e <target>` to list exports
 
 **Any other service**:
-- Run `nmap_scan` with `-sV --script safe` for version detection and safe scripts
+- Run `execute_command`: `nmap -Pn <target> -sV --script safe` for version detection and safe scripts
 - Run `execute_command` with `searchsploit <service> <version>` to check for known exploits
 - Attempt banner grabbing with `execute_command`
 

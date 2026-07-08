@@ -25,10 +25,10 @@ Before any scanning, set up the session workspace:
 
 ## Workflow
 
-1. **Host Discovery**: Run nmap_scan with ping scan (-sn) to discover live hosts.
-2. **Quick Port Scan**: For each live host, run a quick scan of top 100 ports using nmap_scan.
-3. **OS Fingerprinting**: Run nmap_scan with OS detection (-O) against hosts with open ports.
-4. **Service Enumeration**: For interesting hosts, run nmap_scan with version detection (-sV).
+1. **Host Discovery**: Run `execute_command` (nmap) with ping scan (-sn) to discover live hosts.
+2. **Quick Port Scan**: For each live host, run a quick scan of top 100 ports using `execute_command` (nmap).
+3. **OS Fingerprinting**: Run `execute_command` (nmap) with OS detection (-O) against hosts with open ports.
+4. **Service Enumeration**: For interesting hosts, run `execute_command` (nmap) with version detection (-sV).
 5. **Network Mapping**: Summarize topology and identify segments.
 
 Use the Agent tool to launch parallel sub-agents for step 2-4 when multiple hosts are discovered, one agent per host.

@@ -124,7 +124,9 @@ One sub-agent per discovered live host.
 
 ## Authorization via AskUserQuestion
 
-For intrusive tools (hydra_attack, sqlmap_scan, john_crack, metasploit_run), use `AskUserQuestion` to get explicit user confirmation before execution. Never run intrusive tools without asking first.
+All tools run through the single `mcp__kali__execute_command` MCP tool, invoking the raw binary directly (see the TOOLING DIRECTIVE in AGENTS.md). The dedicated wrapper tools (`nmap_scan`, `hydra_attack`, `sqlmap_scan`, …) are deprecated and return HTTP 500 — do not call them.
+
+For intrusive tools (hydra, sqlmap, john, msfconsole/metasploit), use `AskUserQuestion` to get explicit user confirmation before execution. Never run intrusive tools without asking first.
 
 Three authorization levels:
 1. **Passive only** — Scanning and vulnerability identification

@@ -14,7 +14,7 @@ Before starting, use `AskUserQuestion` to ask:
 ## Phase 1: SMB & NetBIOS Enumeration
 
 1. **enum4linux Full Scan**:
-   - Run `mcp__kali__enum4linux_scan` with `-a <target>` for comprehensive enumeration (users, shares, groups, OS info, password policy).
+   - Run `execute_command` (enum4linux) with `-a <target>` for comprehensive enumeration (users, shares, groups, OS info, password policy).
 
 2. **CrackMapExec SMB Enumeration**:
    - Run `mcp__kali__execute_command` with `crackmapexec smb <target> --shares` to list shares.
@@ -27,11 +27,11 @@ Before starting, use `AskUserQuestion` to ask:
    - For each readable share: `smbclient //<target>/<share> -N -c 'ls'` to list contents.
 
 4. **Nmap SMB Scripts**:
-   - Run `mcp__kali__nmap_scan` with `--script smb-enum-shares,smb-enum-users,smb-enum-domains,smb-enum-groups,smb-enum-services,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve-2017-7494,smb-double-pulsar-backdoor -p 139,445 <target>`
+   - Run `execute_command` (nmap) with `--script smb-enum-shares,smb-enum-users,smb-enum-domains,smb-enum-groups,smb-enum-services,smb-os-discovery,smb-security-mode,smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve-2017-7494,smb-double-pulsar-backdoor -p 139,445 <target>`
 
 ## Phase 2: LDAP Enumeration (if port 389/636 open)
 
-1. Run `mcp__kali__nmap_scan` with `--script ldap-rootdse,ldap-search -p 389,636 <target>`
+1. Run `execute_command` (nmap) with `--script ldap-rootdse,ldap-search -p 389,636 <target>`
 2. Run `mcp__kali__execute_command` with `ldapsearch -x -H ldap://<target> -b "" -s base namingContexts` for base DN discovery.
 3. If anonymous bind works, enumerate: `ldapsearch -x -H ldap://<target> -b "<base_dn>" "(objectClass=user)" sAMAccountName memberOf`
 
@@ -42,7 +42,7 @@ Before starting, use `AskUserQuestion` to ask:
    - Test common passwords: Password1, Welcome1, Company123, Summer2024, Winter2024.
 
 2. **Default Credential Checks**:
-   - Run `mcp__kali__hydra_attack` for SMB with `administrator:administrator`, `admin:admin`, `guest:guest`.
+   - Run `execute_command` (hydra) for SMB with `administrator:administrator`, `admin:admin`, `guest:guest`.
 
 3. **Null Session Testing**:
    - Run `mcp__kali__execute_command` with `crackmapexec smb <target> -u '' -p ''`
