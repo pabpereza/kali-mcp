@@ -1,0 +1,76 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "kali",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "ls*": "allow",
+      "cat*": "allow",
+      "grep*": "allow",
+      "rg*": "allow",
+      "find*": "allow",
+      "head*": "allow",
+      "tail*": "allow",
+      "wc*": "allow",
+      "mkdir*": "allow",
+      "date*": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "rm -rf*": "deny",
+      "git push --force*": "deny",
+      "git reset --hard*": "deny"
+    },
+    "webfetch": "ask",
+    "websearch": "ask",
+    "external_directory": {
+      "/Users/pabpereza/afw/kali-mcp/**": "allow",
+      "*": "deny"
+    }
+  },
+  "mcp": {
+    "kali": {
+      "type": "remote",
+      "url": "http://localhost:666/mcp",
+      "enabled": true
+    }
+  },
+  "agent": {
+    "kali": {
+      "description": "Kali Linux ethical hacking assistant — runs authorized penetration tests via MCP toolkit",
+      "mode": "primary",
+      "temperature": 0.2,
+      "permission": {
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow",
+        "bash": {
+          "*": "ask",
+          "ls*": "allow",
+          "cat*": "allow",
+          "grep*": "allow",
+          "rg*": "allow",
+          "find*": "allow",
+          "head*": "allow",
+          "tail*": "allow",
+          "wc*": "allow",
+          "mkdir*": "allow",
+          "touch*": "allow",
+          "date*": "allow",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "rm -rf*": "deny",
+          "git push --force*": "deny",
+          "git reset --hard*": "deny"
+        },
+        "kali_*": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "task": "allow"
+      }
+    }
+  }
+}

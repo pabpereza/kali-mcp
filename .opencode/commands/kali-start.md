@@ -1,16 +1,23 @@
+---
+description: Initialize a Kali MCP pentest session (target + scope).
+agent: kali
+---
+
 Initialize a penetration testing session for target: $ARGUMENTS
 
 You are the **session manager**. Set up the session workspace before any scanning begins.
 
 ## Step 1: Collect Session Parameters
 
-Parse the target(s) from `$ARGUMENTS` if present (comma-separated for multiple). Then use a single `AskUserQuestion` call with up to two questions (skip any already answered by `$ARGUMENTS`):
+Parse the target(s) from `$ARGUMENTS` if present (comma-separated for multiple). Then ask the user any questions not already answered by `$ARGUMENTS`:
 
 1. **Target(s)** (only if not in `$ARGUMENTS`): "Enter the target(s) for this engagement (IP, hostname, URL, or CIDR range):"
 2. **Authorization scope**: "Select the authorization scope for this engagement:"
    - **Passive only** — scanning and vulnerability identification, no brute force, no exploitation.
    - **Passive + Credential testing** — adds brute force with small wordlists.
    - **Full pentest** — all phases including exploitation. May cause service disruption.
+
+Wait for the user's answer before proceeding.
 
 There is a single engagement type — `/kali-audit` — so no need to ask about it.
 

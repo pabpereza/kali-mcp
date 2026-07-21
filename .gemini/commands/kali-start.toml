@@ -1,0 +1,19 @@
+description = "Initialize a Kali MCP pentest session (target + scope)."
+prompt = """
+@{AGENTS.md}
+
+---
+
+@{.claude/commands/kali-start.md}
+
+---
+You are running in Gemini CLI, not Claude Code, so translate the mechanics
+in the runbook above per AGENTS.md § "If you're not Claude Code":
+- `AskUserQuestion` -> ask the same question in plain text and wait for the
+  user's answer before proceeding.
+- `$ARGUMENTS` in the runbook -> the target(s) given below.
+- Session files (`sessions/<dir>/session.md`, `targets.md`, `assets/`) ->
+  create and update them yourself with the same structure.
+
+Target(s): {{args}}
+"""

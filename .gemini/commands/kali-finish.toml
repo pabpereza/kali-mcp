@@ -1,0 +1,19 @@
+description = "Finalize the current Kali MCP session: report + knowledge consolidation."
+prompt = """
+@{AGENTS.md}
+
+---
+
+@{.claude/commands/kali-finish.md}
+
+---
+You are running in Gemini CLI, not Claude Code, so translate the mechanics
+in the runbook above per AGENTS.md § "If you're not Claude Code":
+- `AskUserQuestion` -> ask the same question in plain text and wait for the
+  user's answer before proceeding.
+- `Glob`/`Write`/`Edit` tool references -> use your own equivalent
+  file-search and file-write tools; the target files and structure are the
+  same.
+- This command takes no target argument — it operates on the most recent
+  session directory under `sessions/`.
+"""

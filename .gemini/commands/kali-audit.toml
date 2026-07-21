@@ -1,0 +1,30 @@
+description = "Full security audit / penetration test on a target (Kali MCP)."
+prompt = """
+@{AGENTS.md}
+
+---
+
+@{.claude/commands/kali-audit.md}
+
+---
+You are running in Gemini CLI, not Claude Code, so translate the mechanics
+in the runbook above per AGENTS.md § "If you're not Claude Code":
+- "Launch N sub-agents in parallel" (the `Agent` tool) -> perform those same
+  steps yourself, sequentially, one service/task at a time. Still run Wave A
+  (recon/loot, no brute force or exploit payloads) fully before Wave B
+  (brute force / exploitation), and still seed Wave B with anything
+  harvested in Wave A.
+- `AskUserQuestion` -> ask the same question in plain text and wait for the
+  user's answer before proceeding, especially before any intrusive tool
+  (sqlmap, hydra, john, msfconsole).
+- `$ARGUMENTS` in the runbook -> the target(s) given below.
+- `SESSION_DIR` / session files -> same structure, created and updated with
+  your own file-write tool.
+- Every per-service sub-agent step -> read the matching file in
+  `knowledge/protocols/` (e.g. `knowledge/protocols/ssh.md`; see
+  `knowledge/protocols/index.md` for the full list) instead of guessing the
+  commands. For general tool usage/efficiency notes, check
+  `knowledge/tools/<tool>.md` too.
+
+Target(s): {{args}}
+"""
